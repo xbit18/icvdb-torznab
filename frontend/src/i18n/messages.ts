@@ -126,7 +126,7 @@ export const italianMessages = {
   'prowlarr.intro': 'Collega Prowlarr e installa Violarr come indexer Generic Torznab.',
   'prowlarr.url': 'URL Prowlarr',
   'prowlarr.urlHelp':
-    'Usa un indirizzo raggiungibile da questo container. localhost di solito punta al container Violarr, non a Prowlarr.',
+    'È l’indirizzo usato da Violarr per raggiungere Prowlarr. Se Prowlarr gira sul PC host e Violarr è in Docker Desktop, usa ad esempio http://host.docker.internal:9696.',
   'prowlarr.apiKey': 'Chiave API',
   'prowlarr.keySaved': 'È presente una chiave salvata',
   'prowlarr.noKeySaved': 'Nessuna chiave salvata',
@@ -137,7 +137,7 @@ export const italianMessages = {
   'prowlarr.clearKey': 'Cancella la chiave API salvata al salvataggio',
   'prowlarr.indexerUrl': 'URL indexer visto da Prowlarr',
   'prowlarr.indexerHelp':
-    'Deve essere raggiungibile dal container Prowlarr e terminare con l’endpoint Torznab /api.',
+    'È l’indirizzo che Prowlarr userà per raggiungere Violarr. Se Prowlarr gira sul PC host e la porta 8000 è pubblicata, usa ad esempio http://localhost:8000/api.',
   'prowlarr.save': 'Salva impostazioni Prowlarr',
   'prowlarr.testing': 'Verifica…',
   'prowlarr.test': 'Verifica connessione',
@@ -179,6 +179,38 @@ export const italianMessages = {
   'error.prowlarrUnavailable': 'Prowlarr non è disponibile.',
   'error.prowlarrUnreachable': 'Impossibile connettersi a Prowlarr.',
   'error.prowlarrInvalidJson': 'Prowlarr ha restituito una risposta JSON non valida.',
+  'error.prowlarrUnreachableDetailed': 'Violarr non riesce a raggiungere Prowlarr.',
+  'error.prowlarrUnreachableHint':
+    'Controlla indirizzo e porta. Se Prowlarr gira sul PC host e Violarr è in Docker Desktop, prova http://host.docker.internal:9696. Se entrambi sono container, usa il nome del servizio su una rete Docker condivisa.',
+  'error.prowlarrTimeout': 'Prowlarr non ha risposto entro il tempo previsto.',
+  'error.prowlarrTimeoutHint':
+    'Controlla indirizzo, porta, firewall e connettività tra il container Violarr e Prowlarr.',
+  'error.prowlarrAuthFailed': 'Prowlarr è raggiungibile, ma ha rifiutato la chiave API.',
+  'error.prowlarrAuthFailedHint':
+    'Copia di nuovo la API key da Settings → General → Security in Prowlarr.',
+  'error.prowlarrIndexerTestFailed':
+    'Violarr raggiunge Prowlarr, ma Prowlarr non riesce a validare l’indexer Violarr.',
+  'error.prowlarrIndexerTestFailedHint':
+    'Controlla l’URL indexer dal punto di vista di Prowlarr. Se Prowlarr gira sullo stesso host Windows e Violarr pubblica la porta 8000, prova http://localhost:8000/api.',
+  'error.prowlarrIndexerCreateFailed':
+    'Prowlarr ha ricevuto la configurazione, ma non è riuscito a creare l’indexer.',
+  'error.prowlarrIndexerCreateFailedHint':
+    'Controlla la console del browser e i log di Prowlarr per il dettaglio della validazione.',
+  'error.prowlarrInvalidResponseDetailed':
+    'Prowlarr ha risposto, ma Violarr non riconosce la risposta ricevuta.',
+  'error.prowlarrInvalidResponseHint':
+    'Verifica che l’URL punti davvero a Prowlarr e che la versione in uso esponga le API attese.',
+  'error.prowlarrResponseTooLarge': 'Prowlarr ha restituito una risposta insolitamente grande.',
+  'error.prowlarrResponseTooLargeHint':
+    'Controlla i log di Prowlarr e la configurazione dell’istanza.',
+  'error.prowlarrSchemaUnavailable': 'Lo schema Generic Torznab non è disponibile in Prowlarr.',
+  'error.prowlarrSchemaUnavailableHint':
+    'Verifica la versione di Prowlarr e che Generic Torznab sia disponibile tra gli indexer.',
+  'error.prowlarrNoAppProfile': 'Prowlarr non ha un App Profile valido disponibile.',
+  'error.prowlarrNoAppProfileHint': 'Crea o abilita un App Profile in Prowlarr e riprova.',
+  'error.prowlarrHttpError': 'Prowlarr ha restituito un errore HTTP.',
+  'error.prowlarrHttpErrorHint':
+    'Apri la console del browser per stato HTTP e messaggio restituito da Prowlarr.',
 } as const
 
 export type MessageKey = keyof typeof italianMessages
@@ -311,7 +343,7 @@ export const englishMessages: Messages = {
   'prowlarr.intro': 'Connect Prowlarr and install Violarr as a Generic Torznab indexer.',
   'prowlarr.url': 'Prowlarr URL',
   'prowlarr.urlHelp':
-    'Use an address reachable from this container. localhost usually points back to the Violarr container, not Prowlarr.',
+    'This is the address Violarr uses to reach Prowlarr. If Prowlarr runs on the host and Violarr runs in Docker Desktop, use for example http://host.docker.internal:9696.',
   'prowlarr.apiKey': 'API key',
   'prowlarr.keySaved': 'A key is saved',
   'prowlarr.noKeySaved': 'No key is saved',
@@ -322,7 +354,7 @@ export const englishMessages: Messages = {
   'prowlarr.clearKey': 'Clear the saved API key on Save',
   'prowlarr.indexerUrl': 'Indexer URL as seen by Prowlarr',
   'prowlarr.indexerHelp':
-    'This must be reachable from the Prowlarr container and end at the Torznab /api endpoint.',
+    'This is the address Prowlarr uses to reach Violarr. If Prowlarr runs on the host and port 8000 is published, use for example http://localhost:8000/api.',
   'prowlarr.save': 'Save Prowlarr settings',
   'prowlarr.testing': 'Testing…',
   'prowlarr.test': 'Test connection',
@@ -362,4 +394,35 @@ export const englishMessages: Messages = {
   'error.prowlarrUnavailable': 'Prowlarr is unavailable.',
   'error.prowlarrUnreachable': 'Unable to connect to Prowlarr.',
   'error.prowlarrInvalidJson': 'Prowlarr returned invalid JSON.',
+  'error.prowlarrUnreachableDetailed': 'Violarr cannot reach Prowlarr.',
+  'error.prowlarrUnreachableHint':
+    'Check the address and port. If Prowlarr runs on the host and Violarr runs in Docker Desktop, try http://host.docker.internal:9696. If both are containers, use the service name on a shared Docker network.',
+  'error.prowlarrTimeout': 'Prowlarr did not respond before the timeout.',
+  'error.prowlarrTimeoutHint':
+    'Check the address, port, firewall, and network path between the Violarr container and Prowlarr.',
+  'error.prowlarrAuthFailed': 'Prowlarr is reachable, but it rejected the API key.',
+  'error.prowlarrAuthFailedHint':
+    'Copy the API key again from Settings → General → Security in Prowlarr.',
+  'error.prowlarrIndexerTestFailed':
+    'Violarr can reach Prowlarr, but Prowlarr cannot validate the Violarr indexer.',
+  'error.prowlarrIndexerTestFailedHint':
+    'Check the Indexer URL from Prowlarr’s point of view. If Prowlarr runs on the same Windows host and Violarr publishes port 8000, try http://localhost:8000/api.',
+  'error.prowlarrIndexerCreateFailed':
+    'Prowlarr received the configuration, but it could not create the indexer.',
+  'error.prowlarrIndexerCreateFailedHint':
+    'Check the browser console and Prowlarr logs for the validation details.',
+  'error.prowlarrInvalidResponseDetailed':
+    'Prowlarr responded, but Violarr does not recognize the response.',
+  'error.prowlarrInvalidResponseHint':
+    'Confirm that the URL really points to Prowlarr and that the installed version exposes the expected API.',
+  'error.prowlarrResponseTooLarge': 'Prowlarr returned an unusually large response.',
+  'error.prowlarrResponseTooLargeHint': 'Check the Prowlarr logs and instance configuration.',
+  'error.prowlarrSchemaUnavailable': 'The Generic Torznab schema is unavailable in Prowlarr.',
+  'error.prowlarrSchemaUnavailableHint':
+    'Check the Prowlarr version and confirm Generic Torznab is available among indexers.',
+  'error.prowlarrNoAppProfile': 'Prowlarr has no valid App Profile available.',
+  'error.prowlarrNoAppProfileHint': 'Create or enable an App Profile in Prowlarr and try again.',
+  'error.prowlarrHttpError': 'Prowlarr returned an HTTP error.',
+  'error.prowlarrHttpErrorHint':
+    'Open the browser console to see the HTTP status and the message returned by Prowlarr.',
 }

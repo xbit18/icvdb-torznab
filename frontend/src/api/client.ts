@@ -9,11 +9,41 @@ import { useLocale } from '../i18n'
 
 const { t } = useLocale()
 
+export interface ApiErrorDetail {
+  code: string
+  message: string
+  hint?: string
+  stage?: string
+  upstream_status?: number
+  upstream_message?: string
+}
+
+function structuredDetail(value: unknown): ApiErrorDetail | null {
+  if (!value || typeof value !== 'object') return null
+
+  const candidate = value as Record<string, unknown>
+  if (typeof candidate.code !== 'string' || typeof candidate.message !== 'string') return null
+
+  return {
+    code: candidate.code,
+    message: candidate.message,
+    ...(typeof candidate.hint === 'string' ? { hint: candidate.hint } : {}),
+    ...(typeof candidate.stage === 'string' ? { stage: candidate.stage } : {}),
+    ...(typeof candidate.upstream_status === 'number'
+      ? { upstream_status: candidate.upstream_status }
+      : {}),
+    ...(typeof candidate.upstream_message === 'string'
+      ? { upstream_message: candidate.upstream_message }
+      : {}),
+  }
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number | null = null,
     readonly source: 'client' | 'server' = 'client',
+    readonly detail: ApiErrorDetail | null = null,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -57,9 +87,17 @@ export async function requestJson<T>(path: string, init?: RequestInit): Promise<
     } catch {
       detail = null
     }
-    const serverDetail = typeof detail === 'string' && detail.trim() ? detail : null
-    const message = serverDetail ?? t('error.requestFailed', { status: response.status })
-    throw new ApiError(message, response.status, serverDetail ? 'server' : 'client')
+
+    const objectDetail = structuredDetail(detail)
+    const serverMessage =
+      typeof detail === 'string' && detail.trim()
+        ? detail
+        : objectDetail?.message?.trim()
+          ? objectDetail.message
+          : null
+    const message = serverMessage ?? t('error.requestFailed', { status: response.status })
+
+    throw new ApiError(message, response.status, serverMessage ? 'server' : 'client', objectDetail)
   }
   return response.json() as Promise<T>
 }

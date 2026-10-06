@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { IndexerResult, ProwlarrStatus, PublicSettings } from '../api/types'
-import { apiErrorMessage } from '../api/client'
+import { ApiError, apiErrorMessage } from '../api/client'
 import { useAppStore } from '../composables/appStore'
 import StatusBadge from '../components/StatusBadge.vue'
 import { useLocale } from '../i18n'
@@ -22,6 +22,7 @@ const keyConfigured = ref(false)
 const operation = ref<'save' | 'test' | 'install' | null>(null)
 const success = ref('')
 const failure = ref('')
+const failureHint = ref('')
 const source = computed(() => props.settings ?? store.state.settings)
 const liveStatus = computed(() =>
   props.status === undefined ? store.state.prowlarrStatus : props.status,
@@ -88,6 +89,100 @@ function errorMessage(error: unknown, fallback: string) {
   return apiErrorMessage(error, fallback)
 }
 
+function clearFeedback() {
+  success.value = ''
+  failure.value = ''
+  failureHint.value = ''
+}
+
+function prowlarrErrorText(error: ApiError, fallback: string) {
+  const detail = error.detail
+  if (!detail) return { message: errorMessage(error, fallback), hint: '' }
+
+  console.error('[Violarr:Prowlarr]', {
+    code: detail.code,
+    stage: detail.stage ?? null,
+    violarrStatus: error.status,
+    upstreamStatus: detail.upstream_status ?? null,
+    upstreamMessage: detail.upstream_message ?? null,
+  })
+
+  switch (detail.code) {
+    case 'prowlarr_unreachable':
+      return {
+        message: t('error.prowlarrUnreachableDetailed'),
+        hint: t('error.prowlarrUnreachableHint'),
+      }
+    case 'prowlarr_timeout':
+      return {
+        message: t('error.prowlarrTimeout'),
+        hint: t('error.prowlarrTimeoutHint'),
+      }
+    case 'prowlarr_auth_failed':
+      return {
+        message: t('error.prowlarrAuthFailed'),
+        hint: t('error.prowlarrAuthFailedHint'),
+      }
+    case 'indexer_test_failed':
+      return {
+        message: t('error.prowlarrIndexerTestFailed'),
+        hint: t('error.prowlarrIndexerTestFailedHint'),
+      }
+    case 'indexer_create_failed':
+      return {
+        message: t('error.prowlarrIndexerCreateFailed'),
+        hint: t('error.prowlarrIndexerCreateFailedHint'),
+      }
+    case 'prowlarr_invalid_response':
+    case 'prowlarr_invalid_schema':
+      return {
+        message: t('error.prowlarrInvalidResponseDetailed'),
+        hint: t('error.prowlarrInvalidResponseHint'),
+      }
+    case 'prowlarr_response_too_large':
+      return {
+        message: t('error.prowlarrResponseTooLarge'),
+        hint: t('error.prowlarrResponseTooLargeHint'),
+      }
+    case 'prowlarr_schema_unavailable':
+      return {
+        message: t('error.prowlarrSchemaUnavailable'),
+        hint: t('error.prowlarrSchemaUnavailableHint'),
+      }
+    case 'prowlarr_no_app_profile':
+      return {
+        message: t('error.prowlarrNoAppProfile'),
+        hint: t('error.prowlarrNoAppProfileHint'),
+      }
+    case 'invalid_prowlarr_url':
+      return { message: t('prowlarr.invalidUrl'), hint: '' }
+    case 'invalid_indexer_url':
+      return { message: t('prowlarr.invalidIndexerUrl'), hint: '' }
+    case 'prowlarr_http_error':
+      return {
+        message: t('error.prowlarrHttpError'),
+        hint: t('error.prowlarrHttpErrorHint'),
+      }
+    default:
+      return {
+        message: errorMessage(error, fallback),
+        hint: '',
+      }
+  }
+}
+
+function setFailure(error: unknown, fallback: string) {
+  if (error instanceof ApiError) {
+    const result = prowlarrErrorText(error, fallback)
+    failure.value = result.message
+    failureHint.value = result.hint
+    return
+  }
+
+  failure.value = errorMessage(error, fallback)
+  failureHint.value = ''
+}
+
 async function persist(kind: 'save' | 'test' | 'install') {
   const validation = validate(kind)
   if (validation) throw new Error(validation)
@@ -104,13 +199,12 @@ async function persist(kind: 'save' | 'test' | 'install') {
 async function save() {
   if (busy.value) return
   operation.value = 'save'
-  success.value = ''
-  failure.value = ''
+  clearFeedback()
   try {
     await persist('save')
     success.value = t('prowlarr.settingsSaved')
   } catch (error) {
-    failure.value = errorMessage(error, t('prowlarr.saveFailed'))
+    setFailure(error, t('prowlarr.saveFailed'))
   } finally {
     operation.value = null
   }
@@ -119,17 +213,13 @@ async function save() {
 async function test() {
   if (busy.value) return
   operation.value = 'test'
-  success.value = ''
-  failure.value = ''
+  clearFeedback()
   try {
     await persist('test')
     await (props.testConnection ?? store.testProwlarr)()
     success.value = t('prowlarr.connectionSuccessful')
   } catch (error) {
-    failure.value = errorMessage(
-      error,
-      error instanceof Error ? error.message : t('prowlarr.connectionFailed'),
-    )
+    setFailure(error, error instanceof Error ? error.message : t('prowlarr.connectionFailed'))
   } finally {
     operation.value = null
   }
@@ -138,8 +228,7 @@ async function test() {
 async function install() {
   if (busy.value) return
   operation.value = 'install'
-  success.value = ''
-  failure.value = ''
+  clearFeedback()
   try {
     await persist('install')
     const result = await (props.installIndexer ?? store.installIndexer)()
@@ -147,10 +236,7 @@ async function install() {
       ? t('prowlarr.alreadyInstalled')
       : t('prowlarr.installed')
   } catch (error) {
-    failure.value = errorMessage(
-      error,
-      error instanceof Error ? error.message : t('prowlarr.installFailed'),
-    )
+    setFailure(error, error instanceof Error ? error.message : t('prowlarr.installFailed'))
   } finally {
     operation.value = null
   }
@@ -244,6 +330,9 @@ async function install() {
       <p v-if="success" role="status" class="success-message">{{ success }}</p>
       <p v-if="displayedError" role="alert" class="inline-error">
         {{ displayedError }}
+      </p>
+      <p v-if="failureHint" class="field-help">
+        {{ failureHint }}
       </p>
     </article>
   </section>
