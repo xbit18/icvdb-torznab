@@ -434,6 +434,15 @@ linux/amd64
 linux/arm64
 ```
 
+### Merge rules
+
+- Feature/fix branches target `develop` and use **Squash and merge**.
+- `develop` → `main` uses **Create a merge commit**.
+- Do not squash `develop` → `main`, so Release Please can inspect the individual Conventional Commits.
+- After each release, sync `main` back into `develop`.
+- If only Docker publishing fails, fix the workflow and re-run `Publish Docker image` for the existing tag. Do not create a new release.
+- Do not manually edit `VERSION`, `.release-please-manifest.json`, or `CHANGELOG.md` during normal development.
+
 ## Validation before finishing a change
 
 Run the checks relevant to the files changed.
