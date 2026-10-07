@@ -1,3 +1,4 @@
+import json
 import threading
 from typing import Any
 
@@ -76,8 +77,24 @@ def _prowlarr_configured(request: Request) -> bool:
     return bool(settings["url"] and settings["api_key"])
 
 
-def _safe_prowlarr_error() -> str:
-    return "Prowlarr request failed"
+def _generic_prowlarr_detail(stage: str = "request") -> dict[str, Any]:
+    return {
+        "code": "prowlarr_request_failed",
+        "message": "Prowlarr request failed",
+        "stage": stage,
+    }
+
+
+def _safe_prowlarr_detail(request: Request, error: ProwlarrError) -> dict[str, Any]:
+    detail = error.as_detail()
+    serialized = json.dumps(detail, ensure_ascii=False)
+    settings = _prowlarr_settings(request)
+    api_key = settings["api_key"]
+
+    if (api_key and api_key in serialized) or "traceback" in serialized.casefold():
+        return _generic_prowlarr_detail(error.stage)
+
+    return detail
 
 
 def _live_prowlarr_status(request: Request) -> dict[str, Any]:
@@ -94,7 +111,7 @@ def _live_prowlarr_status(request: Request) -> dict[str, Any]:
         if error:
             settings = _prowlarr_settings(request)
             if settings["api_key"] in str(error) or "traceback" in str(error).casefold():
-                error = _safe_prowlarr_error()
+                error = "Prowlarr request failed"
         return {
             "configured": True,
             "connected": status.get("connected"),
@@ -106,7 +123,7 @@ def _live_prowlarr_status(request: Request) -> dict[str, Any]:
             "configured": True,
             "connected": False,
             "indexer_installed": None,
-            "error": _safe_prowlarr_error(),
+            "error": "Prowlarr request failed",
         }
 
 
@@ -176,9 +193,10 @@ def create_webapi_router() -> APIRouter:
             _prowlarr_client(request).test_connection()
         except HTTPException:
             raise
-        except ProwlarrError:
-            prowlarr_cache.update(connected=False, error=_safe_prowlarr_error())
-            raise HTTPException(status_code=502, detail=_safe_prowlarr_error()) from None
+        except ProwlarrError as exc:
+            detail = _safe_prowlarr_detail(request, exc)
+            prowlarr_cache.update(connected=False, error=detail["message"])
+            raise HTTPException(status_code=502, detail=detail) from None
         prowlarr_cache.update(connected=True, error=None)
         return {"connected": True, "error": None}
 
@@ -188,9 +206,11 @@ def create_webapi_router() -> APIRouter:
             result = _prowlarr_client(request, require_indexer=True).ensure_indexer()
         except HTTPException:
             raise
-        except ProwlarrError:
-            prowlarr_cache.update(connected=False, error=_safe_prowlarr_error())
-            raise HTTPException(status_code=502, detail=_safe_prowlarr_error()) from None
+        except ProwlarrError as exc:
+            detail = _safe_prowlarr_detail(request, exc)
+            connected = exc.code in {"indexer_test_failed", "indexer_create_failed"}
+            prowlarr_cache.update(connected=connected, error=detail["message"])
+            raise HTTPException(status_code=502, detail=detail) from None
         prowlarr_cache.update(
             connected=True,
             indexer_installed=True,

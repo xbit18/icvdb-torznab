@@ -1,9 +1,15 @@
+import io
 import json
 from urllib.error import HTTPError
 
 import pytest
 
-from prowlarr import ProwlarrClient, ProwlarrError, split_indexer_url
+from prowlarr import (
+    INDEXER_OPERATION_TIMEOUT,
+    ProwlarrClient,
+    ProwlarrError,
+    split_indexer_url,
+)
 
 
 class Response:
@@ -61,6 +67,11 @@ def app_profiles():
     return [{"id": 1, "name": "Standard"}]
 
 
+def http_error(status, payload):
+    body = payload if isinstance(payload, bytes) else json.dumps(payload).encode()
+    return HTTPError("http://prowlarr", status, "error", {}, io.BytesIO(body))
+
+
 def client(responses, *, max_response_bytes=1024 * 1024):
     opener = FakeOpener(responses)
     return (
@@ -97,15 +108,19 @@ def test_schema_response_above_default_limit_is_accepted():
 def test_normal_response_above_default_limit_is_rejected():
     subject, _ = client([Response([{"largePayload": "x" * (1024 * 1024)}])])
 
-    with pytest.raises(ProwlarrError, match="^Prowlarr response is too large$"):
+    with pytest.raises(ProwlarrError) as captured:
         subject._indexers()
+
+    assert captured.value.code == "prowlarr_response_too_large"
 
 
 def test_schema_response_above_schema_limit_is_rejected():
     subject, _ = client([Response([{"largePayload": "x" * (16 * 1024 * 1024)}])])
 
-    with pytest.raises(ProwlarrError, match="^Prowlarr response is too large$"):
+    with pytest.raises(ProwlarrError) as captured:
         subject.test_connection()
+
+    assert captured.value.code == "prowlarr_response_too_large"
 
 
 @pytest.mark.parametrize(
@@ -124,15 +139,47 @@ def test_invalid_or_oversized_responses_are_rejected(response):
         subject.test_connection()
 
 
-def test_http_and_transport_errors_never_expose_api_key():
-    error = HTTPError("http://prowlarr", 401, "secret-key", {}, None)
-    subject, _ = client([error])
+def test_transport_error_is_classified_without_exposing_api_key():
+    subject, _ = client([OSError("failed secret-key")])
 
     with pytest.raises(ProwlarrError) as captured:
         subject.test_connection()
 
+    assert captured.value.code == "prowlarr_unreachable"
+    assert captured.value.stage == "connect"
     assert "secret-key" not in str(captured.value)
-    assert "401" in str(captured.value)
+    assert "secret-key" not in json.dumps(captured.value.as_detail())
+
+
+def test_authentication_error_is_classified_and_keeps_safe_upstream_message():
+    subject, _ = client([http_error(401, {"message": "Unauthorized"})])
+
+    with pytest.raises(ProwlarrError) as captured:
+        subject.test_connection()
+
+    error = captured.value
+    assert error.code == "prowlarr_auth_failed"
+    assert error.stage == "connect"
+    assert error.upstream_status == 401
+    assert error.upstream_message == "Unauthorized"
+
+
+def test_upstream_error_message_redacts_api_key_and_traceback():
+    subject, _ = client(
+        [
+            http_error(
+                500,
+                {"message": "secret-key Traceback (most recent call last): private"},
+            )
+        ]
+    )
+
+    with pytest.raises(ProwlarrError) as captured:
+        subject.test_connection()
+
+    detail = captured.value.as_detail()
+    assert "secret-key" not in json.dumps(detail)
+    assert "Traceback" not in json.dumps(detail)
 
 
 def test_schema_is_deep_copied_and_named_fields_are_updated():
@@ -167,15 +214,17 @@ def test_missing_generic_schema_or_required_fields_is_rejected():
     wrong = generic_schema()
     wrong["implementation"] = "Newznab"
     subject, _ = client([Response([wrong])])
-    with pytest.raises(ProwlarrError, match="Generic Torznab"):
+    with pytest.raises(ProwlarrError) as captured:
         subject.build_indexer_resource()
+    assert captured.value.code == "prowlarr_schema_unavailable"
 
     incomplete = generic_schema()
     incomplete["fields"] = incomplete["fields"][:-1]
     incomplete["fields"] = [f for f in incomplete["fields"] if f["name"] != "apiPath"]
     subject, _ = client([Response([incomplete])])
-    with pytest.raises(ProwlarrError, match="apiPath"):
+    with pytest.raises(ProwlarrError) as captured:
         subject.build_indexer_resource()
+    assert captured.value.code == "prowlarr_invalid_schema"
 
 
 def test_existing_indexer_is_detected_by_implementation_and_normalized_endpoint():
@@ -199,6 +248,34 @@ def test_existing_indexer_is_detected_by_implementation_and_normalized_endpoint(
         "indexer_id": None,
     }
     assert len(opener.requests) == 3
+
+
+def test_indexer_test_failure_is_distinguished_from_prowlarr_connection_failure():
+    subject, _ = client(
+        [
+            Response([generic_schema()]),
+            Response(app_profiles()),
+            Response([]),
+            http_error(
+                400,
+                [
+                    {
+                        "propertyName": "BaseUrl",
+                        "errorMessage": "Unable to connect to indexer",
+                    }
+                ],
+            ),
+        ]
+    )
+
+    with pytest.raises(ProwlarrError) as captured:
+        subject.ensure_indexer()
+
+    error = captured.value
+    assert error.code == "indexer_test_failed"
+    assert error.stage == "indexer_test"
+    assert error.upstream_status == 400
+    assert error.upstream_message == "Unable to connect to indexer"
 
 
 def test_create_tests_resource_before_posting_and_preserves_template_defaults():
@@ -236,6 +313,14 @@ def test_create_tests_resource_before_posting_and_preserves_template_defaults():
         "http://prowlarr:9696/api/v1/indexer",
     ]
 
+    assert [timeout for _, timeout in opener.requests] == [
+        subject.timeout,
+        subject.timeout,
+        subject.timeout,
+        INDEXER_OPERATION_TIMEOUT,
+        INDEXER_OPERATION_TIMEOUT,
+    ]
+
     tested = json.loads(opener.requests[-2][0].data)
     created = json.loads(opener.requests[-1][0].data)
 
@@ -265,8 +350,10 @@ def test_indexer_url_is_split_into_origin_and_api_path(url, expected):
     ],
 )
 def test_indexer_url_rejects_query_and_fragment(url):
-    with pytest.raises(ProwlarrError, match="query or fragment"):
+    with pytest.raises(ProwlarrError) as captured:
         split_indexer_url(url)
+
+    assert captured.value.code == "invalid_indexer_url"
 
 
 def test_status_reports_connection_failure_without_secret():
@@ -277,4 +364,5 @@ def test_status_reports_connection_failure_without_secret():
     assert status["configured"] is True
     assert status["connected"] is False
     assert status["indexer_installed"] is False
+    assert status["error"] == "Unable to connect to Prowlarr"
     assert "secret-key" not in json.dumps(status)

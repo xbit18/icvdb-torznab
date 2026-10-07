@@ -23,15 +23,25 @@ PostgreSQL prima di avviare FastAPI. Segui i log e conserva il volume `/data`.
 ## Il test di Prowlarr fallisce
 
 1. Verifica che l'URL di Prowlarr sia raggiungibile dal container Violarr.
-2. Verifica la API key in **Settings → General** di Prowlarr.
-3. Tra container non usare `localhost`, salvo una condivisione del namespace di
-   rete.
-4. Verifica che Prowlarr esponga lo schema Generic Torznab.
+2. Se Violarr gira in Docker e Prowlarr è installato come servizio sul PC host,
+   con Docker Desktop usa normalmente `http://host.docker.internal:9696`.
+3. Se entrambi sono container sulla stessa rete Docker, usa il nome del
+   servizio, ad esempio `http://prowlarr:9696`.
+4. Verifica la API key in **Settings → General → Security** di Prowlarr.
 
-## L'aggiunta riesce ma le ricerche falliscono
+## Prowlarr non riesce ad aggiungere Violarr
 
-L'Indexer URL deve terminare con `/api` ed essere raggiungibile dal **container
-Prowlarr**. Provalo dalla rete corretta, non solo dal browser sull'host.
+Se **Verifica connessione** funziona ma **Aggiungi Violarr a Prowlarr**
+fallisce, la connessione Violarr → Prowlarr funziona: il problema è normalmente
+nella direzione opposta, Prowlarr → Violarr.
+
+- Se Prowlarr gira sullo stesso host Windows e Violarr pubblica la porta `8000`,
+  usa normalmente `http://localhost:8000/api`.
+- Se entrambi sono container sulla stessa rete Docker, usa
+  `http://icvdb-torznab:8000/api`.
+- L'URL deve terminare con `/api`.
+- Controlla il dettaglio mostrato dalla WebUI, la console del browser e i log di
+  Prowlarr.
 
 ## Mancano risultati attesi
 

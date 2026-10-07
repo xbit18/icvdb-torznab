@@ -45,11 +45,22 @@ class FakeProwlarr:
 
     def test_connection(self):
         if self.fail:
-            raise ProwlarrError("Prowlarr is unavailable")
+            raise ProwlarrError(
+                "Unable to connect to Prowlarr",
+                code="prowlarr_unreachable",
+                stage="connect",
+            )
 
     def ensure_indexer(self):
         if self.fail:
-            raise ProwlarrError("Prowlarr rejected the indexer")
+            raise ProwlarrError(
+                "Prowlarr could not validate the Violarr indexer",
+                code="indexer_test_failed",
+                stage="indexer_test",
+                hint="Check the Indexer URL.",
+                upstream_status=400,
+                upstream_message="Unable to connect to indexer",
+            )
         return {
             "created": not self.existing,
             "already_installed": self.existing,
@@ -210,13 +221,10 @@ def test_explicit_database_environment_override_still_wins_at_runtime(tmp_path):
 
     client = TestClient(app)
 
+    assert updater.enabled is True
+    assert updater.interval == 7200
+
     public = client.get("/webapi/settings").json()
-
-    assert public["database_update"] == {
-        "enabled": True,
-        "interval_seconds": 7200,
-    }
-
     public["database_update"] = {
         "enabled": False,
         "interval_seconds": 3600,
@@ -226,11 +234,9 @@ def test_explicit_database_environment_override_still_wins_at_runtime(tmp_path):
 
     assert response.status_code == 200
 
-    # Explicit runtime environment variables intentionally keep precedence.
     assert updater.enabled is True
     assert updater.interval == 7200
 
-    # The environment-owned values are not copied into persisted settings.
     assert store.load_persisted()["database_update"] == {
         "enabled": True,
         "interval_seconds": 86400,
@@ -314,7 +320,7 @@ def test_prowlarr_status_test_and_idempotent_add(web_client):
     assert client.get("/webapi/status").json()["prowlarr"]["indexer_installed"] is True
 
 
-def test_prowlarr_errors_are_400_when_unconfigured_and_502_when_remote_fails(
+def test_prowlarr_errors_are_400_when_unconfigured_and_structured_when_remote_fails(
     web_client,
 ):
     client, app = web_client
@@ -336,7 +342,37 @@ def test_prowlarr_errors_are_400_when_unconfigured_and_502_when_remote_fails(
     response = client.post("/webapi/prowlarr/indexer")
 
     assert response.status_code == 502
+    assert response.json()["detail"] == {
+        "code": "indexer_test_failed",
+        "message": "Prowlarr could not validate the Violarr indexer",
+        "stage": "indexer_test",
+        "hint": "Check the Indexer URL.",
+        "upstream_status": 400,
+        "upstream_message": "Unable to connect to indexer",
+    }
     assert "never-return-this" not in response.text
+
+    cached = client.get("/webapi/status").json()["prowlarr"]
+    assert cached["connected"] is True
+    assert cached["error"] == "Prowlarr could not validate the Violarr indexer"
+
+
+def test_connection_failure_returns_structured_error(web_client):
+    client, app = web_client
+
+    app.state.prowlarr_factory = lambda values: FakeProwlarr(
+        values,
+        fail=True,
+    )
+
+    response = client.post("/webapi/prowlarr/test")
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == {
+        "code": "prowlarr_unreachable",
+        "message": "Unable to connect to Prowlarr",
+        "stage": "connect",
+    }
 
 
 def test_prowlarr_error_body_removes_secret_and_traceback_text(web_client):
@@ -345,7 +381,11 @@ def test_prowlarr_error_body_removes_secret_and_traceback_text(web_client):
     class UnsafeProwlarr(FakeProwlarr):
         def test_connection(self):
             raise ProwlarrError(
-                "never-return-this\nTraceback (most recent call last): secret details"
+                "never-return-this\nTraceback (most recent call last): secret details",
+                code="prowlarr_http_error",
+                stage="connect",
+                upstream_status=500,
+                upstream_message="never-return-this Traceback private",
             )
 
     app.state.prowlarr_factory = lambda values: UnsafeProwlarr(values)
@@ -354,7 +394,11 @@ def test_prowlarr_error_body_removes_secret_and_traceback_text(web_client):
 
     assert response.status_code == 502
     assert response.json() == {
-        "detail": "Prowlarr request failed",
+        "detail": {
+            "code": "prowlarr_request_failed",
+            "message": "Prowlarr request failed",
+            "stage": "connect",
+        }
     }
     assert "never-return-this" not in response.text
     assert "Traceback" not in response.text

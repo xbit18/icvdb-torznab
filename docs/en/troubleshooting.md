@@ -23,15 +23,26 @@ retries.
 ## Prowlarr Test fails
 
 1. Confirm the Prowlarr URL is reachable from the Violarr container.
-2. Confirm the API key in Prowlarr under **Settings → General**.
-3. If both applications are containers, do not use `localhost` unless they share
-   the same network namespace.
-4. Confirm Prowlarr exposes the Generic Torznab schema.
+2. If Violarr runs in Docker and Prowlarr is installed as a Windows service on
+   the host machine, Docker Desktop can normally reach it at
+   `http://host.docker.internal:9696`.
+3. If both applications run as containers on the same Docker network, use the
+   service name, for example `http://prowlarr:9696`.
+4. Confirm the API key in Prowlarr under **Settings → General → Security**.
 
-## Add succeeds but searches fail
+## Prowlarr cannot add Violarr
 
-The Indexer URL must be reachable from the **Prowlarr container** and end at
-`/api`. Test it from the relevant network, not only from the host browser.
+If **Test connection** succeeds but **Add Violarr to Prowlarr** fails, the
+Violarr → Prowlarr connection is working. The problem is usually in the opposite
+direction: Prowlarr → Violarr.
+
+- If Prowlarr runs on the same Windows host and Violarr publishes port `8000`,
+  normally use `http://localhost:8000/api`.
+- If both applications run as containers on the same Docker network, use
+  `http://icvdb-torznab:8000/api`.
+- The URL must end with `/api`.
+- Check the detail shown in the WebUI, the browser console, and the Prowlarr
+  logs.
 
 ## Expected releases are missing
 
