@@ -4,7 +4,12 @@ from urllib.error import HTTPError
 
 import pytest
 
-from prowlarr import ProwlarrClient, ProwlarrError, split_indexer_url
+from prowlarr import (
+    INDEXER_OPERATION_TIMEOUT,
+    ProwlarrClient,
+    ProwlarrError,
+    split_indexer_url,
+)
 
 
 class Response:
@@ -306,6 +311,14 @@ def test_create_tests_resource_before_posting_and_preserves_template_defaults():
         "http://prowlarr:9696/api/v1/indexer",
         "http://prowlarr:9696/api/v1/indexer/test",
         "http://prowlarr:9696/api/v1/indexer",
+    ]
+
+    assert [timeout for _, timeout in opener.requests] == [
+        subject.timeout,
+        subject.timeout,
+        subject.timeout,
+        INDEXER_OPERATION_TIMEOUT,
+        INDEXER_OPERATION_TIMEOUT,
     ]
 
     tested = json.loads(opener.requests[-2][0].data)

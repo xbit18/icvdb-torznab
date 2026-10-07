@@ -7,6 +7,7 @@ from urllib.parse import urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
 DEFAULT_TIMEOUT = 10.0
+INDEXER_OPERATION_TIMEOUT = 30.0
 DEFAULT_MAX_RESPONSE_BYTES = 1024 * 1024
 PROWLARR_SCHEMA_MAX_RESPONSE_BYTES = 16 * 1024 * 1024
 PROWLARR_ERROR_MAX_RESPONSE_BYTES = 64 * 1024
@@ -247,6 +248,7 @@ class ProwlarrClient:
         max_response_bytes: int | None = None,
         *,
         stage: str = "request",
+        timeout: float | None = None,
     ) -> Any:
         effective_max_response_bytes = (
             self.max_response_bytes if max_response_bytes is None else max_response_bytes
@@ -266,7 +268,10 @@ class ProwlarrClient:
             method=method,
         )
         try:
-            with self._opener(request, timeout=self.timeout) as response:
+            with self._opener(
+                request,
+                timeout=self.timeout if timeout is None else timeout,
+            ) as response:
                 length = response.headers.get("Content-Length")
                 if length is not None:
                     try:
@@ -454,12 +459,14 @@ class ProwlarrClient:
             "/api/v1/indexer/test",
             resource,
             stage="indexer_test",
+            timeout=INDEXER_OPERATION_TIMEOUT,
         )
         created = self._request(
             "POST",
             "/api/v1/indexer",
             resource,
             stage="indexer_create",
+            timeout=INDEXER_OPERATION_TIMEOUT,
         )
         identifier = created.get("id") if isinstance(created, dict) else None
         return {

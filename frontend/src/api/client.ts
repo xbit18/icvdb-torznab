@@ -52,7 +52,11 @@ export class ApiError extends Error {
 
 export const REQUEST_TIMEOUT_MS = 10_000
 
-export async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+export async function requestJson<T>(
+  path: string,
+  init?: RequestInit,
+  timeoutMs = REQUEST_TIMEOUT_MS,
+): Promise<T> {
   const controller = new AbortController()
   let timedOut = false
   const forwardAbort = () => controller.abort(init?.signal?.reason)
@@ -61,7 +65,7 @@ export async function requestJson<T>(path: string, init?: RequestInit): Promise<
   const timeout = setTimeout(() => {
     timedOut = true
     controller.abort()
-  }, REQUEST_TIMEOUT_MS)
+  }, timeoutMs)
   let response: Response
   try {
     response = await fetch(path, {
@@ -121,6 +125,12 @@ export const api = {
     requestJson<ResultProcessing>('/webapi/result-processing', json(value)),
   prowlarrStatus: () => requestJson<ProwlarrStatus>('/webapi/prowlarr/status'),
   testProwlarr: () =>
-    requestJson<{ connected: true; error: null }>('/webapi/prowlarr/test', { method: 'POST' }),
-  installIndexer: () => requestJson<IndexerResult>('/webapi/prowlarr/indexer', { method: 'POST' }),
+    requestJson<{ connected: true; error: null }>(
+      '/webapi/prowlarr/test',
+      { method: 'POST' },
+      20_000,
+    ),
+
+  installIndexer: () =>
+    requestJson<IndexerResult>('/webapi/prowlarr/indexer', { method: 'POST' }, 40_000),
 }
