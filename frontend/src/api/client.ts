@@ -132,5 +132,5 @@ export const api = {
     ),
 
   installIndexer: () =>
-    requestJson<IndexerResult>('/webapi/prowlarr/indexer', { method: 'POST' }, 40_000),
+    requestJson<IndexerResult>('/webapi/prowlarr/indexer', { method: 'POST' }, 100_000),
 }
