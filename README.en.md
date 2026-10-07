@@ -1,13 +1,31 @@
-# Violarr
+<h1 align="center">
+  <a href="https://github.com/henriquesebastiao/downtify" target="_blank" rel="noopener noreferrer">
+    <picture>
+      <img width="150"src="docs/public/logo.png" alt="Logo di Violarr" width="180">
+    </picture>
+  </a>
+  <br>
+  Violarr
+</h1>
 
-<img src="docs/public/logo.png" alt="Violarr logo" width="180">
+<p align="center">
+  <strong>Self-hosted wrapper to use ICVDB as a Prowlarr indexer</strong>
+</p>
 
-[![GitHub Release](https://img.shields.io/github/v/release/xbit18/violarr?color=blue)](https://github.com/xbit18/violarr/releases)
-[![GitHub License](https://img.shields.io/github/license/xbit18/violarr?color=green)](/LICENSE)
+<div align="center">
 
-[Italiano](README.md) · [English](README.en.md)
+[![CI](https://img.shields.io/github/actions/workflow/status/xbit18/violarr/ci.yml?label=test
+)](https://github.com/xbit18/violarr/actions/workflows/ci.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/xbit18/violarr)](https://github.com/xbit18/violarr/releases)
+[![GitHub License](https://img.shields.io/github/license/xbit18/violarr)](/LICENSE)
+[![Visitors](https://api.visitorbadge.io/api/visitors?path=xbit18%2Fviolarr&label=repository%20visits&countColor=%231182c3&style=flat)](https://github.com/xbit18/violarr)
 
-**Violarr lets you use the rich ICVDB database directly with Prowlarr.**
+[Documentation](https://xbit18.github.io/violarr/en) ·
+[Installation](https://xbit18.github.io/violarr/en/getting-started/installation) ·
+[How to use](https://xbit18.github.io/violarr/en/configuration/webui) ·
+[Changelog](https://github.com/xbit18/violarr/blob/main/CHANGELOG.md)
+
+</div>
 
 ## Features
 
