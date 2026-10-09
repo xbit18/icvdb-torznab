@@ -28,3 +28,16 @@ receive them.
 
 Read more about [Italian ranking](../features/italian-ranking) or the
 [technical details](../how-it-works/result-processing).
+
+## Language correction
+
+**Correct Italian subtitle detection** is disabled by default. When enabled, it
+prevents releases with explicit markers such as `SUB ITA`, `SUB.ITA`,
+`SUB-ITA`, or `ITA.SUBBED` from being interpreted as Italian audio merely
+because the subtitles are Italian.
+
+This is a heuristic: for matching results, Violarr sends `language=English`
+in Torznab metadata; **it does not inspect actual audio tracks**. It skips
+releases with separate Italian audio indicators or `MULTI`/`DUAL` markers.
+Original titles and magnet links are unchanged. Italian presets also avoid
+interpreting corrected subtitle-only releases as Italian.

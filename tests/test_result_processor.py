@@ -123,3 +123,16 @@ def rule(field, operator, value, action, score=None, enabled=True):
 def test_invalid_rule_shapes_are_rejected(rules):
     with pytest.raises(ResultProcessingError):
         process_results([row("Movie")], "custom", rules)
+
+
+def test_italian_presets_respect_optional_subtitle_correction():
+    rows = [row("Show.SUB.ITA"), row("Show.ITA"), row("Show.MULTI.SUB.ITA")]
+    assert [r[0] for r in process_results(rows, "italian_only", [])] == [
+        "Show.SUB.ITA", "Show.ITA", "Show.MULTI.SUB.ITA"
+    ]
+    assert [r[0] for r in process_results(
+        rows, "italian_only", [], subtitle_language_correction=True
+    )] == ["Show.ITA", "Show.MULTI.SUB.ITA"]
+    assert [r[0] for r in process_results(
+        rows, "italian_preferred", [], subtitle_language_correction=True
+    )] == ["Show.ITA", "Show.MULTI.SUB.ITA", "Show.SUB.ITA"]

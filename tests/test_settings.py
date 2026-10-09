@@ -15,6 +15,7 @@ def test_first_load_creates_valid_defaults(tmp_path):
     assert settings["result_processing"] == {
         "preset": "unfiltered",
         "custom_rules": [],
+        "subtitle_language_correction": False,
     }
     assert settings["prowlarr"] == {
         "url": "",
@@ -288,3 +289,28 @@ def test_public_update_rejects_unknown_fields_without_overwrite(tmp_path):
         store.update_public(public)
 
     assert store.load_persisted() == original
+
+
+def test_subtitle_language_correction_persists_and_defaults_off(tmp_path):
+    path = tmp_path / "settings.json"
+    store = SettingsStore(path=path, environ={})
+    settings = store.load()
+    assert settings["result_processing"]["subtitle_language_correction"] is False
+
+    settings["result_processing"]["subtitle_language_correction"] = True
+    store.save(settings)
+    assert SettingsStore(path=path, environ={}).load()["result_processing"]["subtitle_language_correction"] is True
+
+    # Existing installations without the field are migrated in memory.
+    old = json.loads(path.read_text(encoding="utf-8"))
+    old["result_processing"].pop("subtitle_language_correction")
+    path.write_text(json.dumps(old), encoding="utf-8")
+    assert SettingsStore(path=path, environ={}).load()["result_processing"]["subtitle_language_correction"] is False
+
+
+def test_subtitle_language_correction_rejects_non_bool(tmp_path):
+    store = SettingsStore(path=tmp_path / "settings.json", environ={})
+    settings = store.load()
+    settings["result_processing"]["subtitle_language_correction"] = "true"
+    with pytest.raises(SettingsError, match="subtitle_language_correction"):
+        store.save(settings)
