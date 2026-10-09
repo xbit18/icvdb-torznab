@@ -114,9 +114,6 @@ updates:
 
     cooldown:
       default-days: 14
-      semver-major-days: 30
-      semver-minor-days: 14
-      semver-patch-days: 7
 
     groups:
       github-actions-minor-patch:
@@ -139,9 +136,6 @@ updates:
 
     cooldown:
       default-days: 14
-      semver-major-days: 30
-      semver-minor-days: 14
-      semver-patch-days: 7
 
     groups:
       docker-minor-patch:
