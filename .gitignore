@@ -25,3 +25,5 @@ frontend/coverage/
 frontend/*.tsbuildinfo
 
 node_modules/
+
+odd/

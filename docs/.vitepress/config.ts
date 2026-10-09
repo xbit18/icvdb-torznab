@@ -46,6 +46,10 @@ const italianSidebar = [
         text: 'Schema di configurazione',
         link: '/reference/configuration-schema',
       },
+      {
+        text: 'Contribuire',
+        link: 'https://github.com/xbit18/violarr/blob/develop/CONTRIBUTING.md',
+      },
       { text: 'Changelog', link: '/changelog' },
     ],
   },
@@ -70,6 +74,7 @@ const englishLabels: Record<string, string> = {
   'Aggiornamenti sicuri': 'Safe updates',
   'Funzionalità Torznab': 'Torznab capabilities',
   'Schema di configurazione': 'Configuration schema',
+  Contribuire: 'Contributing guide',
 }
 
 const englishSidebar = italianSidebar.map((section) => ({
@@ -78,7 +83,7 @@ const englishSidebar = italianSidebar.map((section) => ({
   items: section.items.map((item) => ({
     ...item,
     text: englishLabels[item.text] ?? item.text,
-    link: `/en${item.link}`,
+    link: item.link.startsWith('http') ? item.link : `/en${item.link}`,
   })),
 }))
 
