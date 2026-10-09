@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here.
 
+## [1.1.4](https://github.com/xbit18/violarr/compare/v1.1.3...v1.1.4) (2026-10-07)
+
+
+### Bug Fixes
+
+* improve Prowlarr connection diagnostics ([3dbfeea](https://github.com/xbit18/violarr/commit/3dbfeea27b94af4a78d023f0644addbaa15062b2))
+
 ## [1.1.3](https://github.com/xbit18/violarr/compare/v1.1.2...v1.1.3) (2026-10-06)
 
 
