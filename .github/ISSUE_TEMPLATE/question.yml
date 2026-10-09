@@ -1,0 +1,35 @@
+name: Question or support request
+description: Ask a question or get help with Violarr.
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: Share what you are trying to do and where you need help.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question or support request
+      description: What would you like help with?
+      placeholder: Describe your question or the issue you need help resolving.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Relevant context
+      description: What have you tried, and what happened?
+  - type: input
+    id: version
+    attributes:
+      label: Violarr version (optional)
+      description: Enter the version or image tag, if known.
+      placeholder: e.g. 1.2.3
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs (optional)
+      description: >-
+        Include relevant logs if helpful. Remove secrets and other sensitive
+        information before posting.
+      render: text

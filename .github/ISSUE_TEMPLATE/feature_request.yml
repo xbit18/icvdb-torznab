@@ -1,0 +1,38 @@
+name: Feature request
+description: Suggest an improvement for Violarr.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for sharing an idea to improve Violarr.
+  - type: textarea
+    id: feature
+    attributes:
+      label: Proposed feature
+      description: What would you like Violarr to do?
+      placeholder: Describe the feature you are proposing.
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Problem or use case
+      description: What problem would this solve, or when would you use it?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Suggested solution
+      description: How do you imagine this feature working?
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Have you considered any other approaches?
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add any other details, examples, or screenshots.

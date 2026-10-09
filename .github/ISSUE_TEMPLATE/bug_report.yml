@@ -1,0 +1,62 @@
+name: Bug report
+description: Report a problem with Violarr.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Thanks for taking the time to report a bug. Please share only information
+        that is safe to make public.
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug description
+      description: What happened?
+      placeholder: Describe the problem clearly.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What steps can we follow to reproduce the problem?
+      placeholder: |
+        1. Go to ...
+        2. Do ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+  - type: input
+    id: version
+    attributes:
+      label: Violarr version
+      description: Enter the version or image tag, if known.
+      placeholder: e.g. 1.2.3
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment method
+      options:
+        - Docker
+        - Docker Compose
+        - Runtipi
+        - Other
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: >-
+        Include relevant logs if available. Remove secrets and other sensitive
+        information before posting.
+      render: text
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Screenshots or additional context
+      description: Add screenshots or any other details that may help.
