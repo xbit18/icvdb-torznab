@@ -291,6 +291,7 @@ def test_result_processing_get_and_put_are_focused(web_client):
         == 422
     )
 
+
 def test_prowlarr_status_test_and_idempotent_add(web_client):
     client, app = web_client
 
