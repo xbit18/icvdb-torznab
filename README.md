@@ -19,6 +19,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/xbit18/violarr)](https://github.com/xbit18/violarr/releases)
 [![GitHub License](https://img.shields.io/github/license/xbit18/violarr)](/LICENSE)
 [![Visitors](https://api.visitorbadge.io/api/visitors?path=xbit18%2Fviolarr&label=repository%20visits&countColor=%231182c3&style=flat)](https://github.com/xbit18/violarr)
+![Dynamic JSON Badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fghcr-badge.elias.eu.org%2Fapi%2Fxbit18%2Fviolarr%2Fviolarr&query=downloadCount&label=Image%20pulls&color=red)
 
 [Documentazione](xbit18.github.io/violarr) ·
 [Installazione](https://xbit18.github.io/violarr/getting-started/installation) ·
