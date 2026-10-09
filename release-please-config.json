@@ -6,7 +6,24 @@
       "package-name": "violarr",
       "version-file": "VERSION",
       "include-component-in-tag": false,
-      "include-v-in-tag": true
+      "include-v-in-tag": true,
+      "exclude-paths": [
+        ".github",
+        ".githooks",
+        "AGENTS.md",
+        "ARCHITECTURE.md",
+        "CONTRIBUTING.md",
+        "README.md",
+        "README.en.md",
+        "LICENSE",
+        "commitlint.config.mjs",
+        "release-please-config.json",
+        "ruff.toml",
+        "setup.sh",
+        "setup.bat",
+        "requirements-dev.txt",
+        "docker-compose.test.yml"
+      ]
     }
   }
 }
