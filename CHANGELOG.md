@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here.
 
+## [1.1.5](https://github.com/xbit18/violarr/compare/v1.1.4...v1.1.5) (2026-10-09)
+
+
+### Features
+
+* add dynamic JSON badge for download count in README ([#25](https://github.com/xbit18/violarr/issues/25)) ([ab1783c](https://github.com/xbit18/violarr/commit/ab1783c2d70057d0287b26da788b5a2837754086))
+
+
+### Bug Fixes
+
+* correct Italian subtitle language detection ([#14](https://github.com/xbit18/violarr/issues/14)) ([b9c094f](https://github.com/xbit18/violarr/commit/b9c094fabd4e078e02d6d89af0132a27f082f9ad))
+
 ## [1.1.4](https://github.com/xbit18/violarr/compare/v1.1.3...v1.1.4) (2026-10-07)
 
 
