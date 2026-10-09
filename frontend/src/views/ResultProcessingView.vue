@@ -12,10 +12,15 @@ const errors = reactive<string[]>([])
 onMounted(() => {
   if (props.initial === undefined) store.loadAll()
 })
-const model = reactive<ResultProcessing>({ preset: 'unfiltered', custom_rules: [] })
+const model = reactive<ResultProcessing>({
+  preset: 'unfiltered',
+  custom_rules: [],
+  subtitle_language_correction: false,
+})
 const cloneProcessing = (value: ResultProcessing): ResultProcessing => ({
   preset: value.preset,
   custom_rules: value.custom_rules.map((rule) => ({ ...rule })),
+  subtitle_language_correction: value.subtitle_language_correction,
 })
 watch(
   () => props.initial ?? store.state.settings?.result_processing,
@@ -219,6 +224,14 @@ const isSaving = computed(() => props.saving ?? store.state.saving)
           {{ t('results.remove') }}
         </button>
       </fieldset>
+    </article>
+    <article class="card rules-card">
+      <h2>{{ t('results.languageCorrectionTitle') }}</h2>
+      <ToggleSwitch
+        v-model="model.subtitle_language_correction"
+        :label="t('results.languageCorrectionLabel')"
+        :description="t('results.languageCorrectionDescription')"
+      />
     </article>
     <ul v-if="errors.length" class="inline-error" role="alert">
       <li v-for="error in errors" :key="error">{{ error }}</li>

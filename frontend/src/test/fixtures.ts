@@ -21,7 +21,11 @@ export const statusFixture: AppStatus = {
 export const settingsFixture: PublicSettings = {
   schema_version: 1,
   database_update: { enabled: true, interval_seconds: 86400 },
-  result_processing: { preset: 'unfiltered', custom_rules: [] },
+  result_processing: {
+    preset: 'unfiltered',
+    custom_rules: [],
+    subtitle_language_correction: false,
+  },
   prowlarr: {
     url: 'http://prowlarr:9696',
     indexer_url: 'http://icvdb-torznab:8000/api',

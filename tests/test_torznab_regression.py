@@ -217,3 +217,40 @@ def test_filtered_pagination_fetches_the_window_for_large_offsets(client, monkey
     root = ElementTree.fromstring(response.content)
     assert calls == [(None, app_module.RESULT_CANDIDATE_WINDOW, 1000)]
     assert [item.findtext("title") for item in root.findall("channel/item")] == ["Movie.ITA.1000"]
+
+
+def test_subtitle_correction_adds_language_only_when_enabled(client, monkeypatch):
+    titles = [
+        "Rick.and.Morty.S09E04.[SUB ITA]",
+        "Rick.and.Morty.S09E04.ITA.ENG",
+        "Rick.and.Morty.S09E04.MULTI.[SUB ITA]",
+    ]
+    monkeypatch.setattr(
+        app_module, "query_generic", lambda *args: [sample_row(title) for title in titles]
+    )
+
+    def items():
+        response = client.get("/api", params={"t": "search", "q": "Rick"})
+        assert response.status_code == 200
+        result = []
+        for item in ElementTree.fromstring(response.content).findall("channel/item"):
+            attrs = {
+                entry.attrib["name"]: entry.attrib["value"]
+                for entry in item
+                if entry.tag.endswith("attr")
+            }
+            result.append((item.findtext("title"), attrs))
+        return result
+
+    disabled = items()
+    assert [title for title, _ in disabled] == titles
+    assert all("language" not in attrs for _, attrs in disabled)
+
+    settings = app_module.SETTINGS_STORE.load()
+    settings["result_processing"]["subtitle_language_correction"] = True
+    app_module.SETTINGS_STORE.save(settings)
+    enabled = items()
+    assert [title for title, _ in enabled] == titles
+    assert enabled[0][1]["language"] == "English"
+    assert "language" not in enabled[1][1]
+    assert "language" not in enabled[2][1]

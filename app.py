@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from release_language import should_force_english
 from result_processor import process_results
 from settings import SettingsStore
 from snapshot_updater import install_snapshot_updater
@@ -626,7 +627,7 @@ def category_for_type(torrent_type: str):
     return 5000
 
 
-def make_rss(rows):
+def make_rss(rows, *, subtitle_language_correction=False):
     rss = Element(
         "rss",
         {
@@ -747,6 +748,9 @@ def make_rss(rows):
             category,
         )
 
+        if subtitle_language_correction and should_force_english(title):
+            attr("language", "English")
+
         attr(
             "infohash",
             info_hash,
@@ -818,6 +822,7 @@ def query_processed(query, query_args, limit, offset):
             rows,
             processing["preset"],
             processing["custom_rules"],
+            subtitle_language_correction=processing["subtitle_language_correction"],
         )
         local_start = max(offset - window_offset, 0)
         local_end = min(request_end - window_offset, RESULT_CANDIDATE_WINDOW)
@@ -853,6 +858,9 @@ def torznab(
         )
 
     imdb_id = normalize_imdb(imdbid)
+    subtitle_language_correction = SETTINGS_STORE.load()["result_processing"][
+        "subtitle_language_correction"
+    ]
 
     if t == "search":
         rows = query_processed(
@@ -863,7 +871,7 @@ def torznab(
         )
 
         return Response(
-            content=make_rss(rows),
+            content=make_rss(rows, subtitle_language_correction=subtitle_language_correction),
             media_type="application/xml",
         )
 
@@ -876,7 +884,7 @@ def torznab(
         )
 
         return Response(
-            content=make_rss(rows),
+            content=make_rss(rows, subtitle_language_correction=subtitle_language_correction),
             media_type="application/xml",
         )
 
@@ -889,7 +897,7 @@ def torznab(
         )
 
         return Response(
-            content=make_rss(rows),
+            content=make_rss(rows, subtitle_language_correction=subtitle_language_correction),
             media_type="application/xml",
         )
 

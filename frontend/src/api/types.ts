@@ -15,6 +15,7 @@ export interface CustomRule {
 export interface ResultProcessing {
   preset: Preset
   custom_rules: CustomRule[]
+  subtitle_language_correction: boolean
 }
 
 export interface PublicSettings {
