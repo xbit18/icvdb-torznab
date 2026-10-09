@@ -299,13 +299,23 @@ def test_subtitle_language_correction_persists_and_defaults_off(tmp_path):
 
     settings["result_processing"]["subtitle_language_correction"] = True
     store.save(settings)
-    assert SettingsStore(path=path, environ={}).load()["result_processing"]["subtitle_language_correction"] is True
+    assert (
+        SettingsStore(path=path, environ={}).load()["result_processing"][
+            "subtitle_language_correction"
+        ]
+        is True
+    )
 
     # Existing installations without the field are migrated in memory.
     old = json.loads(path.read_text(encoding="utf-8"))
     old["result_processing"].pop("subtitle_language_correction")
     path.write_text(json.dumps(old), encoding="utf-8")
-    assert SettingsStore(path=path, environ={}).load()["result_processing"]["subtitle_language_correction"] is False
+    assert (
+        SettingsStore(path=path, environ={}).load()["result_processing"][
+            "subtitle_language_correction"
+        ]
+        is False
+    )
 
 
 def test_subtitle_language_correction_rejects_non_bool(tmp_path):

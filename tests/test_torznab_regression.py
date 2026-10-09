@@ -234,8 +234,11 @@ def test_subtitle_correction_adds_language_only_when_enabled(client, monkeypatch
         assert response.status_code == 200
         result = []
         for item in ElementTree.fromstring(response.content).findall("channel/item"):
-            attrs = {entry.attrib["name"]: entry.attrib["value"]
-                     for entry in item if entry.tag.endswith("attr")}
+            attrs = {
+                entry.attrib["name"]: entry.attrib["value"]
+                for entry in item
+                if entry.tag.endswith("attr")
+            }
             result.append((item.findtext("title"), attrs))
         return result
 

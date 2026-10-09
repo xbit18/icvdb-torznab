@@ -208,7 +208,9 @@ def validate_settings(settings: Any) -> dict[str, Any]:
 
     processing = settings["result_processing"]
     _require_object(processing, "result_processing")
-    _require_keys(processing, {"preset", "custom_rules", "subtitle_language_correction"}, "result_processing")
+    _require_keys(
+        processing, {"preset", "custom_rules", "subtitle_language_correction"}, "result_processing"
+    )
     if not isinstance(processing["subtitle_language_correction"], bool):
         raise SettingsError("result_processing.subtitle_language_correction must be a boolean")
     if processing["preset"] not in PRESETS:

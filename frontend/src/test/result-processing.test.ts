@@ -8,12 +8,14 @@ describe('result processing', () => {
   it('reveals custom rules only for Custom and saves a valid structured payload', async () => {
     const save = vi.fn().mockResolvedValue(undefined)
     render(ResultProcessingView, {
-      props: { initial: {
-        preset: 'unfiltered',
-        custom_rules: [],
-        subtitle_language_correction: false,
+      props: {
+        initial: {
+          preset: 'unfiltered',
+          custom_rules: [],
+          subtitle_language_correction: false,
+        },
+        saving: false,
       },
-      saving: false },
       attrs: { onSave: save },
     })
 
@@ -70,7 +72,9 @@ describe('result processing', () => {
       },
       attrs: { onSave: save },
     })
-    expect((screen.getByRole('switch', { name: 'Rule 1 enabled' }) as HTMLInputElement).checked).toBe(false)
+    expect(
+      (screen.getByRole('switch', { name: 'Rule 1 enabled' }) as HTMLInputElement).checked,
+    ).toBe(false)
     await fireEvent.update(screen.getByLabelText('Rule 1 Value'), '')
     await fireEvent.update(screen.getByLabelText('Rule 1 Score'), '1001')
     await fireEvent.click(screen.getByRole('button', { name: 'Save result processing' }))

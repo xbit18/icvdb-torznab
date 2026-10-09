@@ -82,7 +82,8 @@ def process_results(
         return materialized
     if preset == "italian_only":
         return [
-            row for row in materialized
+            row
+            for row in materialized
             if _has_explicit_italian_marker(_value(row, 0), subtitle_language_correction)
         ]
     if preset == "italian_preferred":
