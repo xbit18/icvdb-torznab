@@ -55,6 +55,10 @@ When the service is ready, open `http://localhost:8000/` and complete the
 - [Architecture](ARCHITECTURE.md)
 - [Changelog](CHANGELOG.md)
 
+## Contributing
+
+See the [contributing guide](CONTRIBUTING.md) for the project workflow.
+
 ## License
 
 MIT
