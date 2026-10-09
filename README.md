@@ -55,6 +55,10 @@ Quando il servizio è pronto, apri `http://localhost:8000/` e completa la
 - [Architecture](ARCHITECTURE.md)
 - [Changelog](CHANGELOG.md)
 
+## Contribuire
+
+Consulta la [guida per contribuire](CONTRIBUTING.md), disponibile in inglese.
+
 ## Licenza
 
 MIT
