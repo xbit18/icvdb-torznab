@@ -5,6 +5,7 @@ updates:
   - package-ecosystem: pip
     directory: /
     target-branch: develop
+    open-pull-requests-limit: 3
 
     schedule:
       interval: weekly
@@ -30,6 +31,7 @@ updates:
   - package-ecosystem: npm
     directory: /
     target-branch: develop
+    open-pull-requests-limit: 3
 
     schedule:
       interval: weekly
@@ -55,6 +57,7 @@ updates:
   - package-ecosystem: npm
     directory: /frontend
     target-branch: develop
+    open-pull-requests-limit: 3
 
     schedule:
       interval: weekly
@@ -80,6 +83,7 @@ updates:
   - package-ecosystem: npm
     directory: /docs
     target-branch: develop
+    open-pull-requests-limit: 3
 
     schedule:
       interval: weekly
@@ -105,6 +109,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     target-branch: develop
+    open-pull-requests-limit: 3
 
     schedule:
       interval: weekly
@@ -127,6 +132,7 @@ updates:
   - package-ecosystem: docker
     directory: /
     target-branch: develop
+    open-pull-requests-limit: 3
 
     schedule:
       interval: weekly
@@ -136,6 +142,12 @@ updates:
 
     cooldown:
       default-days: 14
+
+    ignore:
+      # Keep Node.js on the current LTS major version.
+      - dependency-name: "node"
+        update-types:
+          - version-update:semver-major
 
     groups:
       docker-minor-patch:
