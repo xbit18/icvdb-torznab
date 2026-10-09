@@ -263,6 +263,7 @@ def test_result_processing_get_and_put_are_focused(web_client):
     assert client.get("/webapi/result-processing").json() == {
         "preset": "unfiltered",
         "custom_rules": [],
+        "subtitle_language_correction": False,
     }
 
     response = client.put(
@@ -270,11 +271,13 @@ def test_result_processing_get_and_put_are_focused(web_client):
         json={
             "preset": "italian_preferred",
             "custom_rules": [],
+            "subtitle_language_correction": True,
         },
     )
 
     assert response.status_code == 200
     assert response.json()["preset"] == "italian_preferred"
+    assert response.json()["subtitle_language_correction"] is True
 
     assert (
         client.put(
@@ -282,11 +285,11 @@ def test_result_processing_get_and_put_are_focused(web_client):
             json={
                 "preset": "unknown",
                 "custom_rules": [],
+                "subtitle_language_correction": True,
             },
         ).status_code
         == 422
     )
-
 
 def test_prowlarr_status_test_and_idempotent_add(web_client):
     client, app = web_client

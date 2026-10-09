@@ -110,7 +110,9 @@ describe('result processing', () => {
       },
       attrs: { onSave: save },
     })
-    const toggle = screen.getByRole('switch', { name: 'Correct Italian subtitle detection' })
+    const toggle = screen.getByRole('switch', {
+      name: /Correct Italian subtitle detection/i,
+    })
     expect((toggle as HTMLInputElement).checked).toBe(false)
     await fireEvent.click(toggle)
     await fireEvent.click(screen.getByRole('button', { name: 'Save result processing' }))
