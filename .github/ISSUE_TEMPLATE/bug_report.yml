@@ -36,8 +36,10 @@ body:
     id: version
     attributes:
       label: Violarr version
-      description: Enter the version or image tag, if known.
+      description: Enter the version or image tag you are running.
       placeholder: e.g. 1.2.3
+    validations:
+      required: true
   - type: dropdown
     id: deployment
     attributes:
@@ -60,3 +62,11 @@ body:
     attributes:
       label: Screenshots or additional context
       description: Add screenshots or any other details that may help.
+  - type: checkboxes
+    id: existing-issues
+    attributes:
+      label: Existing issues
+      description: Please search existing issues before submitting.
+      options:
+        - label: I have searched existing issues and found no duplicate.
+          required: true

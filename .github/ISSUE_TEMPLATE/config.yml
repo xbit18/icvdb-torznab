@@ -1,1 +1,5 @@
 blank_issues_enabled: false
+contact_links:
+  - name: Violarr documentation
+    url: https://xbit18.github.io/violarr/
+    about: Check the documentation for setup and usage guidance before opening an issue.
