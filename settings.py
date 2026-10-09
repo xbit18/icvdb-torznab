@@ -28,6 +28,7 @@ DEFAULT_SETTINGS = {
     "result_processing": {
         "preset": "unfiltered",
         "custom_rules": [],
+        "subtitle_language_correction": False,
     },
     "prowlarr": {
         "url": "",
@@ -207,7 +208,11 @@ def validate_settings(settings: Any) -> dict[str, Any]:
 
     processing = settings["result_processing"]
     _require_object(processing, "result_processing")
-    _require_keys(processing, {"preset", "custom_rules"}, "result_processing")
+    _require_keys(
+        processing, {"preset", "custom_rules", "subtitle_language_correction"}, "result_processing"
+    )
+    if not isinstance(processing["subtitle_language_correction"], bool):
+        raise SettingsError("result_processing.subtitle_language_correction must be a boolean")
     if processing["preset"] not in PRESETS:
         raise SettingsError("result_processing.preset is invalid")
     try:

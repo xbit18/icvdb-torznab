@@ -122,6 +122,10 @@ export const italianMessages = {
   'results.textError': 'La regola {number} richiede un testo fino a 512 caratteri.',
   'results.numberError': 'La regola {number} richiede un numero finito.',
   'results.scoreError': 'Il punteggio della regola {number} deve essere compreso tra -1000 e 1000.',
+  'results.languageCorrectionTitle': 'Correzione lingua',
+  'results.languageCorrectionLabel': 'Correggi il riconoscimento dei sottotitoli italiani',
+  'results.languageCorrectionDescription':
+    'Evita che le release con sottotitoli italiani vengano erroneamente riconosciute come contenuti con audio italiano.',
   'results.save': 'Salva elaborazione risultati',
   'prowlarr.intro': 'Collega Prowlarr e installa Violarr come indexer Generic Torznab.',
   'prowlarr.url': 'URL Prowlarr',
@@ -339,6 +343,10 @@ export const englishMessages: Messages = {
   'results.textError': 'Rule {number} needs a text value up to 512 characters.',
   'results.numberError': 'Rule {number} needs a finite number.',
   'results.scoreError': 'Rule {number} score must be between -1000 and 1000.',
+  'results.languageCorrectionTitle': 'Language correction',
+  'results.languageCorrectionLabel': 'Correct Italian subtitle detection',
+  'results.languageCorrectionDescription':
+    'Prevent releases with Italian subtitles from being incorrectly recognized as having Italian audio.',
   'results.save': 'Save result processing',
   'prowlarr.intro': 'Connect Prowlarr and install Violarr as a Generic Torznab indexer.',
   'prowlarr.url': 'Prowlarr URL',

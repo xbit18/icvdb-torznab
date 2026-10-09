@@ -8,7 +8,14 @@ describe('result processing', () => {
   it('reveals custom rules only for Custom and saves a valid structured payload', async () => {
     const save = vi.fn().mockResolvedValue(undefined)
     render(ResultProcessingView, {
-      props: { initial: { preset: 'unfiltered', custom_rules: [] }, saving: false },
+      props: {
+        initial: {
+          preset: 'unfiltered',
+          custom_rules: [],
+          subtitle_language_correction: false,
+        },
+        saving: false,
+      },
       attrs: { onSave: save },
     })
 
@@ -23,6 +30,7 @@ describe('result processing', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Save result processing' }))
     expect(save).toHaveBeenCalledWith({
       preset: 'custom',
+      subtitle_language_correction: false,
       custom_rules: [
         {
           enabled: true,
@@ -49,6 +57,7 @@ describe('result processing', () => {
       props: {
         initial: {
           preset: 'custom',
+          subtitle_language_correction: false,
           custom_rules: [
             {
               enabled: false,
@@ -63,7 +72,9 @@ describe('result processing', () => {
       },
       attrs: { onSave: save },
     })
-    expect((screen.getByRole('switch') as HTMLInputElement).checked).toBe(false)
+    expect(
+      (screen.getByRole('switch', { name: 'Rule 1 enabled' }) as HTMLInputElement).checked,
+    ).toBe(false)
     await fireEvent.update(screen.getByLabelText('Rule 1 Value'), '')
     await fireEvent.update(screen.getByLabelText('Rule 1 Score'), '1001')
     await fireEvent.click(screen.getByRole('button', { name: 'Save result processing' }))
@@ -80,10 +91,35 @@ describe('result processing', () => {
       value: 'x',
       action: 'exclude' as const,
     }))
-    render(ResultProcessingView, { props: { initial: { preset: 'custom', custom_rules: rules } } })
+    render(ResultProcessingView, {
+      props: {
+        initial: { preset: 'custom', custom_rules: rules, subtitle_language_correction: false },
+      },
+    })
     expect((screen.getByRole('button', { name: 'Add rule' }) as HTMLButtonElement).disabled).toBe(
       true,
     )
     expect(screen.getAllByRole('group')).toHaveLength(100)
+  })
+
+  it('keeps subtitle language correction independent from the preset', async () => {
+    const save = vi.fn()
+    render(ResultProcessingView, {
+      props: {
+        initial: { preset: 'unfiltered', custom_rules: [], subtitle_language_correction: false },
+      },
+      attrs: { onSave: save },
+    })
+    const toggle = screen.getByRole('switch', {
+      name: /Correct Italian subtitle detection/i,
+    })
+    expect((toggle as HTMLInputElement).checked).toBe(false)
+    await fireEvent.click(toggle)
+    await fireEvent.click(screen.getByRole('button', { name: 'Save result processing' }))
+    expect(save).toHaveBeenCalledWith({
+      preset: 'unfiltered',
+      custom_rules: [],
+      subtitle_language_correction: true,
+    })
   })
 })

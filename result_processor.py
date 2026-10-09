@@ -2,6 +2,8 @@ import math
 import re
 from typing import Any, Iterable, Sequence
 
+from release_language import should_force_english
+
 PRESETS = {"unfiltered", "italian_preferred", "italian_only", "custom"}
 TEXT_FIELDS = {"title": 0, "provider": 3}
 NUMBER_FIELDS = {"size": 1, "seeders": 2}
@@ -69,6 +71,8 @@ def process_results(
     rows: Iterable[Sequence[Any]],
     preset: str,
     custom_rules: Any,
+    *,
+    subtitle_language_correction: bool = False,
 ) -> list[Sequence[Any]]:
     if preset not in PRESETS:
         raise ResultProcessingError("unknown result-processing preset")
@@ -77,9 +81,16 @@ def process_results(
     if preset == "unfiltered":
         return materialized
     if preset == "italian_only":
-        return [row for row in materialized if _has_explicit_italian_marker(_value(row, 0))]
+        return [
+            row
+            for row in materialized
+            if _has_explicit_italian_marker(_value(row, 0), subtitle_language_correction)
+        ]
     if preset == "italian_preferred":
-        return _stable_rank(materialized, _italian_score)
+        return _stable_rank(
+            materialized,
+            lambda row: _italian_score(row, subtitle_language_correction),
+        )
 
     rules = validate_rules(custom_rules)
     enabled = [rule for rule in rules if rule["enabled"]]
@@ -96,9 +107,9 @@ def _stable_rank(rows, score):
     return [row for _, row in sorted(enumerate(rows), key=lambda item: -score(item[1]))]
 
 
-def _italian_score(row):
+def _italian_score(row, subtitle_language_correction=False):
     title = _value(row, 0)
-    if _has_explicit_italian_marker(title):
+    if _has_explicit_italian_marker(title, subtitle_language_correction):
         return 100
     tokens = _title_tokens(title)
     if "MULTI" in tokens or "DUAL" in tokens:
@@ -106,7 +117,9 @@ def _italian_score(row):
     return 0
 
 
-def _has_explicit_italian_marker(title):
+def _has_explicit_italian_marker(title, subtitle_language_correction=False):
+    if subtitle_language_correction and should_force_english(title):
+        return False
     return bool(_title_tokens(title) & {"ITA", "ITALIAN", "ITALIANO"})
 
 
