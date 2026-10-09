@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here.
 
-## [1.2.0](https://github.com/xbit18/violarr/compare/v1.1.4...v1.2.0) (2026-10-09)
+## [1.1.5](https://github.com/xbit18/violarr/compare/v1.1.4...v1.1.5) (2026-10-09)
 
 
 ### Features
