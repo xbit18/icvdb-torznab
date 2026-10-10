@@ -316,6 +316,64 @@ describe('diagnostics', () => {
     expect(screen.queryByRole('button', { name: 'Replay request' })).toBeNull()
   })
 
+  it('toggles inspected details in their request card when reopening, switching and replaying', async () => {
+    const first = entry()
+    const second = {
+      ...entry(),
+      id: 2,
+      original: { ...entry().original, q: 'Second original query' },
+      normalized: { q: 'Second normalized query' },
+    }
+    history = [first, second]
+    mount()
+    await requests()
+    const firstButton = screen.getByRole('button', { name: 'Inspect request 1' })
+    const secondButton = screen.getByRole('button', { name: 'Inspect request 2' })
+    const firstCard = firstButton.closest('article')!
+    const secondCard = secondButton.closest('article')!
+
+    await fireEvent.click(firstButton)
+    expect.soft(within(firstCard).queryByRole('heading', { name: 'Request details' })).toBeTruthy()
+    expect.soft(within(firstCard).queryByText(/Original query/, { selector: 'pre' })).toBeTruthy()
+    expect.soft(within(firstCard).queryByText(/Different normalized query/)).toBeTruthy()
+    expect.soft(within(secondCard).queryByRole('heading', { name: 'Request details' })).toBeNull()
+    expect.soft(screen.getAllByRole('heading', { name: 'Request details' })).toHaveLength(1)
+
+    await fireEvent.click(firstButton)
+    expect.soft(screen.queryByRole('heading', { name: 'Request details' })).toBeNull()
+    expect.soft(within(firstCard).queryByText(/Original query/, { selector: 'pre' })).toBeNull()
+    expect.soft(within(firstCard).queryByText(/Different normalized query/)).toBeNull()
+    expect.soft(screen.queryByRole('button', { name: 'Replay request' })).toBeNull()
+
+    await fireEvent.click(firstButton)
+    expect.soft(within(firstCard).queryByRole('heading', { name: 'Request details' })).toBeTruthy()
+    expect.soft(within(firstCard).queryByText(/Original query/, { selector: 'pre' })).toBeTruthy()
+    expect.soft(within(firstCard).queryByRole('button', { name: 'Replay request' })).toBeTruthy()
+    expect.soft(within(secondCard).queryByRole('heading', { name: 'Request details' })).toBeNull()
+    expect.soft(screen.getAllByRole('heading', { name: 'Request details' })).toHaveLength(1)
+
+    await fireEvent.click(secondButton)
+    expect.soft(within(firstCard).queryByRole('heading', { name: 'Request details' })).toBeNull()
+    expect.soft(within(firstCard).queryByText(/Original query/, { selector: 'pre' })).toBeNull()
+    expect.soft(within(firstCard).queryByRole('button', { name: 'Replay request' })).toBeNull()
+    expect.soft(within(secondCard).queryByRole('heading', { name: 'Request details' })).toBeTruthy()
+    expect
+      .soft(within(secondCard).queryByText(/Second original query/, { selector: 'pre' }))
+      .toBeTruthy()
+    expect.soft(within(secondCard).queryByText(/Second normalized query/)).toBeTruthy()
+    expect.soft(screen.getAllByRole('heading', { name: 'Request details' })).toHaveLength(1)
+    expect.soft(screen.getAllByRole('button', { name: 'Replay request' })).toHaveLength(1)
+    expect.soft(within(secondCard).queryByRole('button', { name: 'Replay request' })).toBeTruthy()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Replay request' }))
+    await flushPromises()
+    const call = fetchMock.mock.calls.find(([p]) => p.endsWith('/search'))!
+    expect(call[1].method).toBe('POST')
+    expect(JSON.parse(call[1].body)).toEqual(second.original)
+    expect(screen.getByText(/Replay uses the current database and settings/)).toBeTruthy()
+    expect(screen.getByText('Sensitive series SUB ITA')).toBeTruthy()
+  })
+
   it('replays original parameters as a fresh POST with current-state notice', async () => {
     mount()
     await requests()

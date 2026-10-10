@@ -573,39 +573,42 @@ onBeforeUnmount(() => {
           <button
             class="button button--secondary"
             :aria-label="t('diagnostics.inspect', { id: entry.id })"
-            @click="inspected = entry"
+            @click="inspected = inspected?.id === entry.id ? null : entry"
           >
             {{ t('diagnostics.inspect', { id: entry.id }) }}
           </button>
         </div>
-      </article>
-      <article v-if="inspected" class="card">
-        <h2>{{ t('diagnostics.requestDetail') }}</h2>
-        <h3>{{ t('diagnostics.original') }}</h3>
-        <pre>{{ JSON.stringify(inspected.original, null, 2) }}</pre>
-        <h3>{{ t('diagnostics.normalized') }}</h3>
-        <pre>{{ JSON.stringify(inspected.normalized, null, 2) }}</pre>
-        <p>{{ t('diagnostics.strategy') }}: {{ inspected.strategy ?? t('common.notAvailable') }}</p>
-        <dl class="detail-list">
-          <div v-for="name in counts" :key="name">
-            <dt>{{ t(`diagnostics.count.${name}`) }}</dt>
-            <dd>{{ inspected.counts[name] }}</dd>
-          </div>
-          <div v-for="(stage, name) in inspected.stages" :key="name">
-            <dt>{{ t(`diagnostics.stage.${name}`) }}</dt>
-            <dd>
-              {{ t(`diagnostics.status.${stage.status}`) }} · {{ stage.duration_ms.toFixed(1) }} ms
-            </dd>
-          </div>
-        </dl>
-        <p>{{ t('diagnostics.boundaries') }}</p>
-        <p v-for="issue in inspected.errors" :key="issue.code" class="danger-text">
-          {{ issue.message }} ({{ issue.code }})
-        </p>
-        <p v-if="!inspected.replayable" class="notice">{{ t('diagnostics.notReplayable') }}</p>
-        <button class="button" :disabled="!inspected.replayable || busy" @click="replay">
-          {{ t('diagnostics.replay') }}
-        </button>
+        <template v-if="inspected && inspected.id === entry.id">
+          <h2>{{ t('diagnostics.requestDetail') }}</h2>
+          <h3>{{ t('diagnostics.original') }}</h3>
+          <pre>{{ JSON.stringify(inspected.original, null, 2) }}</pre>
+          <h3>{{ t('diagnostics.normalized') }}</h3>
+          <pre>{{ JSON.stringify(inspected.normalized, null, 2) }}</pre>
+          <p>
+            {{ t('diagnostics.strategy') }}: {{ inspected.strategy ?? t('common.notAvailable') }}
+          </p>
+          <dl class="detail-list">
+            <div v-for="name in counts" :key="name">
+              <dt>{{ t(`diagnostics.count.${name}`) }}</dt>
+              <dd>{{ inspected.counts[name] }}</dd>
+            </div>
+            <div v-for="(stage, name) in inspected.stages" :key="name">
+              <dt>{{ t(`diagnostics.stage.${name}`) }}</dt>
+              <dd>
+                {{ t(`diagnostics.status.${stage.status}`) }} ·
+                {{ stage.duration_ms.toFixed(1) }} ms
+              </dd>
+            </div>
+          </dl>
+          <p>{{ t('diagnostics.boundaries') }}</p>
+          <p v-for="issue in inspected.errors" :key="issue.code" class="danger-text">
+            {{ issue.message }} ({{ issue.code }})
+          </p>
+          <p v-if="!inspected.replayable" class="notice">{{ t('diagnostics.notReplayable') }}</p>
+          <button class="button" :disabled="!inspected.replayable || busy" @click="replay">
+            {{ t('diagnostics.replay') }}
+          </button>
+        </template>
       </article>
     </template>
   </section>
