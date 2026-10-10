@@ -100,7 +100,7 @@ def test_invalid_serialized_bytes_cannot_claim_success(store, monkeypatch):
     monkeypatch.setattr(backend, "query_generic", lambda *args: [row()])
     monkeypatch.setattr(backend, "make_rss", lambda *args, **kwargs: b"not XML")
     observed = collector()
-    with pytest.raises(ElementTree.ParseError):
+    assert (
         run_search(
             dict(
                 t="search",
@@ -114,6 +114,8 @@ def test_invalid_serialized_bytes_cannot_claim_success(store, monkeypatch):
             ),
             observed,
         )
+        == b"not XML"
+    )
     assert observed.report["stages"]["serialization"]["status"] == "failed"
     assert observed.report["counts"]["returned"] == 0
     assert observed.report["releases"][0]["status"] != "returned"
@@ -258,8 +260,7 @@ def test_serialization_success_requires_rss_output_with_actual_items(store, monk
     monkeypatch.setattr(backend, "query_generic", lambda *args: [row()])
     monkeypatch.setattr(backend, "make_rss", lambda *args, **kwargs: b"<rss><channel/></rss>")
     observed = collector()
-    with pytest.raises(ValueError):
-        run_search({"limit": 1, "offset": 0}, observed)
+    assert run_search({"limit": 1, "offset": 0}, observed) == b"<rss><channel/></rss>"
     assert observed.report["counts"]["returned"] == 0
 
 

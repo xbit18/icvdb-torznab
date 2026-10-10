@@ -5,12 +5,12 @@ import {
   diagnosticsApi,
   exportReport,
   exportHistory,
+  observedStages,
   type SearchInput,
   type SearchType,
   type SearchReport,
   type MonitoredRequest,
   type MonitoringStatus,
-  type StageName,
 } from '../api/diagnostics'
 import ToggleSwitch from '../components/ToggleSwitch.vue'
 import { useLocale } from '../i18n'
@@ -41,7 +41,7 @@ const inspected = ref<MonitoredRequest | null>(null)
 const historyBusy = ref(false)
 const actionBusy = ref(false)
 const historyError = ref('')
-const stages: StageName[] = ['input', 'database', 'processing', 'serialization']
+const stages = computed(() => (report.value ? observedStages(report.value) : []))
 const counts = [
   'candidates',
   'excluded',
@@ -60,7 +60,9 @@ const succeeded = computed(
   () =>
     report.value &&
     report.value.errors.length === 0 &&
-    stages.every((name) => report.value!.stages[name].status === 'success'),
+    stages.value.every((name) => report.value!.stages[name]?.status === 'success') &&
+    (report.value.report_version === 1 ||
+      report.value.strategies.every((strategy) => strategy.status === 'success')),
 )
 function message(cause: unknown) {
   if (cause instanceof ApiError && cause.status === 503) return t('diagnostics.maintenance')
@@ -100,11 +102,13 @@ async function execute(input: SearchInput) {
     const result = await diagnosticsApi.search(input, controller.signal)
     if (
       !result ||
-      result.report_version !== 1 ||
+      (result.report_version !== 1 && result.report_version !== 2) ||
       !result.stages ||
       !result.counts ||
       !Array.isArray(result.releases) ||
-      !Array.isArray(result.errors)
+      !Array.isArray(result.errors) ||
+      (result.report_version === 2 &&
+        (!Array.isArray(result.strategies) || !Array.isArray(result.provenance)))
     )
       throw new ApiError(t('diagnostics.missingReport'))
     if (!disposed && searchController === controller) report.value = result
@@ -271,7 +275,7 @@ function download(content = preview.value, historyExport = false) {
     anchor.href = url
     anchor.download = historyExport
       ? 'violarr-request-history-v1.json'
-      : 'violarr-diagnostics-v1.json'
+      : `violarr-diagnostics-v${report.value?.report_version ?? 2}.json`
     anchor.click()
   } catch {
     if (historyExport) historyError.value = t('diagnostics.exportError')
@@ -442,14 +446,46 @@ onBeforeUnmount(() => {
             <span
               class="badge"
               :class="{
-                'badge--success': report.stages[name].status === 'success',
-                'badge--danger': report.stages[name].status === 'failed',
+                'badge--success': report.stages[name]?.status === 'success',
+                'badge--danger': report.stages[name]?.status === 'failed',
               }"
-              >{{ t(`diagnostics.status.${report.stages[name].status}`) }}</span
+              >{{ t(`diagnostics.status.${report.stages[name]?.status ?? 'not_run'}`) }}</span
             >
-            <p>{{ report.stages[name].duration_ms.toFixed(1) }} ms</p>
+            <p>{{ report.stages[name]?.duration_ms.toFixed(1) }} ms</p>
           </article>
         </div>
+        <article v-if="report.report_version === 2" class="card">
+          <h2>{{ t('diagnostics.strategies') }}</h2>
+          <div v-for="(strategy, index) in report.strategies" :key="index">
+            <h3>{{ strategy.identifier }}</h3>
+            <p>
+              <span class="badge">{{ t(`diagnostics.status.${strategy.status}`) }}</span> ·
+              {{ strategy.duration_ms.toFixed(1) }} ms
+            </p>
+            <p>
+              {{ t('diagnostics.count.candidates') }}:
+              {{ strategy.candidates ?? t('common.notAvailable') }} ·
+              {{ t('diagnostics.uniqueContribution') }}:
+              {{ strategy.unique_contribution ?? t('common.notAvailable') }}
+            </p>
+          </div>
+          <h2>{{ t('diagnostics.provenance') }}</h2>
+          <div v-for="item in report.provenance" :key="item.identity">
+            <p>{{ item.identity }}</p>
+            <p>{{ item.strategies.join(', ') }} · {{ item.occurrences.join(', ') }}</p>
+            <p v-for="(evidence, index) in item.match_evidence" :key="index">
+              {{ evidence.strategy }} · {{ evidence.field ?? t('common.notAvailable') }} ·
+              {{ evidence.match_type ?? t('common.notAvailable') }}
+            </p>
+            <p>
+              {{ t('diagnostics.deduplicated') }}:
+              {{ item.deduplicated === null ? t('common.notAvailable') : item.deduplicated }} ·
+              {{ t('diagnostics.relevance') }}: {{ item.relevance ?? t('common.notAvailable') }} ·
+              {{ t('diagnostics.included') }}:
+              {{ item.included === null ? t('common.notAvailable') : item.included }}
+            </p>
+          </div>
+        </article>
         <article class="card">
           <h2>{{ t('diagnostics.context') }}</h2>
           <details>
@@ -610,7 +646,8 @@ onBeforeUnmount(() => {
         <p
           v-if="
             entry.errors.length ||
-            Object.values(entry.stages).some((stage) => stage.status === 'failed')
+            Object.values(entry.stages).some((stage) => stage.status === 'failed') ||
+            entry.strategies?.some((strategy) => strategy.status !== 'success')
           "
           class="danger-text"
         >
@@ -645,6 +682,15 @@ onBeforeUnmount(() => {
           <p>
             {{ t('diagnostics.strategy') }}: {{ inspected.strategy ?? t('common.notAvailable') }}
           </p>
+          <div v-for="(strategy, index) in inspected.strategies ?? []" :key="index">
+            <p>
+              {{ strategy.identifier }} · {{ t(`diagnostics.status.${strategy.status}`) }} ·
+              {{ strategy.duration_ms.toFixed(1) }} ms · {{ t('diagnostics.count.candidates') }}:
+              {{ strategy.candidates ?? t('common.notAvailable') }} ·
+              {{ t('diagnostics.uniqueContribution') }}:
+              {{ strategy.unique_contribution ?? t('common.notAvailable') }}
+            </p>
+          </div>
           <dl class="detail-list">
             <div v-for="name in counts" :key="name">
               <dt>{{ t(`diagnostics.count.${name}`) }}</dt>
@@ -653,8 +699,8 @@ onBeforeUnmount(() => {
             <div v-for="(stage, name) in inspected.stages" :key="name">
               <dt>{{ t(`diagnostics.stage.${name}`) }}</dt>
               <dd>
-                {{ t(`diagnostics.status.${stage.status}`) }} ·
-                {{ stage.duration_ms.toFixed(1) }} ms
+                {{ t(`diagnostics.status.${stage?.status ?? 'not_run'}`) }} ·
+                {{ stage?.duration_ms.toFixed(1) }} ms
               </dd>
             </div>
           </dl>

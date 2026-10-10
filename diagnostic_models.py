@@ -47,7 +47,7 @@ class Counts(BaseModel):
 
 
 class SafeError(BaseModel):
-    stage: Literal["input", "database", "processing", "serialization", "http"]
+    stage: Literal["input", "database", "processing", "serialization", "search", "merge", "http"]
     code: Text
     message: Text
 
@@ -60,6 +60,7 @@ class Window(BaseModel):
 
 class Release(BaseModel):
     id: Text
+    identity: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
     title: Text | None
     size: int | None
     seeders: int | None
@@ -96,14 +97,18 @@ class SerializationSettings(BaseModel):
 
 
 class SearchReport(BaseModel):
-    report_version: Literal[1]
+    report_version: Literal[2]
     application_version: Text
     snapshot_version: Text | None
     generated_at: Text
     original: dict[str, Parameter]
     normalized: dict[str, Parameter]
     strategy: Text | None
-    stages: dict[Literal["input", "database", "processing", "serialization"], Stage]
+    strategies: list["StrategyExecution"] = Field(max_length=32)
+    provenance: list["Provenance"] = Field(max_length=2000)
+    stages: dict[
+        Literal["input", "database", "processing", "serialization", "search", "merge"], Stage
+    ]
     counts: Counts
     windows: list[Window] = Field(max_length=2)
     releases: list[Release] = Field(max_length=2000)
@@ -122,6 +127,7 @@ class MonitoredRequest(BaseModel):
     original: dict[str, Parameter]
     normalized: dict[str, Parameter]
     strategy: Text | None
+    strategies: list["StrategyExecution"] = Field(default_factory=list, max_length=32)
     stages: dict[str, Stage]
     counts: Counts
     duration_ms: float
@@ -133,3 +139,35 @@ class MonitoredRequest(BaseModel):
 
 class RequestHistory(BaseModel):
     requests: list[MonitoredRequest] = Field(max_length=100)
+
+
+class MatchMetadata(BaseModel):
+    field: Literal["title", "imdb", "tmdb", "season", "episode"] | None = None
+    match_type: Literal["exact", "contains", "token", "browse"] | None = None
+
+
+class StrategyExecution(BaseModel):
+    identifier: Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")]
+    status: Literal["running", "success", "partial", "failed"]
+    duration_ms: float = Field(ge=0)
+    candidates: int | None = Field(default=None, ge=0)
+    unique_contribution: int | None = Field(default=None, ge=0)
+    metadata: MatchMetadata
+
+
+class MatchEvidence(MatchMetadata):
+    strategy: Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")]
+
+
+class Provenance(BaseModel):
+    identity: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+    occurrences: list[Text] = Field(max_length=2000)
+    strategies: list[Text] = Field(max_length=32)
+    match_evidence: list[MatchEvidence] = Field(max_length=32)
+    deduplicated: bool | None = None
+    relevance: float | None = Field(default=None, allow_inf_nan=False)
+    included: bool | None = None
+
+
+SearchReport.model_rebuild()
+MonitoredRequest.model_rebuild()

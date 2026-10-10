@@ -35,7 +35,7 @@ runtime container.
 | `settings.py`           | Schema-v1 validation, atomic persistence, environment precedence, public secret masking     |
 | `result_processor.py`   | Italian presets and bounded custom score/exclusion rules                                    |
 | `webapi.py`             | Same-origin JSON status, settings, processing, Prowlarr, and diagnostics endpoints          |
-| `diagnostic_models.py`  | Strict bounded diagnostic inputs and report-v1 response contracts                           |
+| `diagnostic_models.py`  | Strict bounded diagnostic inputs and report-v2 response contracts                           |
 | `search_diagnostics.py` | Optional request-scoped stage/window/candidate collection and structural redaction          |
 | `search_monitor.py`     | Failure-isolated Torznab observation and bounded thread-safe in-memory history              |
 | `prowlarr.py`           | `X-Api-Key` client, Generic Torznab schema derivation, test/create/idempotency              |
@@ -171,13 +171,17 @@ Radarr/Sonarr selection. Hard filters hide results from Prowlarr entirely.
 `/diagnostics` in the Vue WebUI defaults to Search. Its simple/advanced form sends
 `POST /webapi/diagnostics/search` to the same `execute_search()` path as `/api`:
 normalization → database window lookup → existing result processing/pagination →
-ElementTree serialization and validation of the actual RSS root and item count.
-There is no second SQL or filtering implementation. The collector is scoped through
-a `ContextVar` and does not change normal ordering, ignored parameters, subtitle
+ElementTree serialization and observation of the actual RSS root, item count and
+selected identity order. There is no second SQL or filtering implementation. An
+explicit `ObservationFacade` isolates every collector event and processing callback;
+failed XML inspection marks the report partial without replacing the actual response.
+Actual search exceptions still propagate. A narrow `ContextVar` carries only the safe
+facade to existing SQL branch markers; nested `finally` resets it even if observation
+fails. It does not change normal ordering, ignored parameters, subtitle
 correction, settings precedence, or snapshot-switch behavior. `cat` remains accepted
 but unused by queries; TV searches still ignore `tmdbid`.
 
-Report v1 carries original/normalized allowlisted parameters, selected strategy,
+Report v2 carries original/normalized allowlisted parameters, a legacy strategy summary,
 four stage statuses/timings, inspected windows, processing settings/indexed rules,
 separate serialization settings, app/snapshot versions, bounded candidate metadata,
 safe errors, truncation/replayability flags and limitations. Counts are window-local,
@@ -188,6 +192,45 @@ subtitle-correction flag used during processing. Stage failures produce partial
 reports with HTTP `200`: consumers must inspect statuses/errors, not HTTP success.
 Invalid diagnostic JSON produces a safe `422`; maintenance middleware can return
 `503` before diagnostic handlers run.
+
+### Observation interface for future strategy implementers
+
+This interface observes an engine; it does not execute strategies or merge results.
+Production still executes its existing single query branch per fixed SQL window.
+
+| Event                                                                            | Contract                                                                                                                                      |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `strategy_begin(identifier, metadata=None)`                                      | Lowercase symbolic identifier (64 characters maximum); metadata accepts only `field` and `match_type` enum values, never search values or SQL |
+| `strategy_result(DiagnosticResult, occurrence, metadata=None)`                   | Associate the active execution with an opaque identity and distinct occurrence; does not remove duplicate rows                                |
+| `strategy_complete(status="success", candidates=None, unique_contribution=None)` | Report observed candidate count and success/partial/failed status; ownership stays unavailable unless explicitly observed                     |
+| `result_facts(result, deduplicated=None, relevance=None, included=None)`         | Optional facts from an actual engine observation, never inferred from filter scores or the number of occurrences                              |
+| `begin("search")` / `begin("merge")`, `complete()`                               | Optional phases alongside the legacy input/database/processing/serialization phases; omitted unless emitted                                   |
+
+Pass these events through `ObservationFacade`, not a raw collector. Existing branch
+markers call `record_strategy()`; `window()` completes that execution and adapts rows
+only for detailed diagnostics. `DiagnosticResult.from_row()` is the sole seven-field
+row adapter for observation; query, processing and RSS paths keep their original rows.
+Settings events capture the existing two reads in order: XML settings first, then
+processing settings. No extra settings reads, queries or filtering decisions occur.
+
+Detailed reports retain at most 32 executions and 2000 candidate occurrences/identity
+records. An identity is SHA256 of the exact stored info-hash string, never the raw hash
+or magnet; it remains stable across row order and window offsets. This permits
+correlation, not anonymization. Occurrence IDs (`window_offset:index`) remain separate
+for duplicate-row exclusion, ranking and pagination decisions. Provenance aggregates
+strategy identifiers and bounded categorical match evidence per identity.
+Current execution does **not** deduplicate, merge, or compute search relevance, so
+deduplicated/relevance/included provenance facts and unique contribution are `null`.
+Processing `score` retains its existing filter/preset meaning, not search relevance.
+Candidate counts count inspected occurrences, including duplicates; they are not
+unique-result counts. Synthetic tests emit overlap, partial/failure and deduplication
+facts without adding production strategies.
+
+The browser accepts and exports v1 and v2 reports using version-aware scalar allowlists;
+the server emits v2. Request-history export retains its independent version `1` and
+adds bounded strategy execution metadata, never result provenance. Disabled collection
+does not adapt/hash rows, collect rule histories or inspect XML; metadata-only monitoring
+does not adapt/hash rows or inspect XML. Detailed XML inspection is capped at 4 MB.
 
 Requests uses `GET/PUT /webapi/diagnostics/monitoring` and
 `GET/DELETE /webapi/diagnostics/requests`. Monitoring defaults off and is runtime-only.

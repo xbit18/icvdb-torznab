@@ -4,7 +4,6 @@ from pathlib import Path
 from xml.etree.ElementTree import (
     Element,
     SubElement,
-    fromstring,
     register_namespace,
     tostring,
 )
@@ -17,7 +16,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from release_language import should_force_english
 from result_processor import process_results
-from search_diagnostics import ACTIVE_COLLECTOR, SearchCollector, record_strategy, safe_text
+from search_diagnostics import ACTIVE_COLLECTOR, ObservationFacade, SearchCollector, record_strategy
 from search_monitor import SearchMonitor, SearchMonitoringMiddleware
 from settings import SettingsStore
 from snapshot_updater import install_snapshot_updater
@@ -820,23 +819,7 @@ def make_rss(rows, *, subtitle_language_correction=False):
 def query_processed(query, query_args, limit, offset, collector=None):
     processing = SETTINGS_STORE.load()["result_processing"]
     if collector is not None:
-        collector.report["processing"] = {
-            "preset": processing["preset"],
-            "subtitle_language_correction": processing["subtitle_language_correction"],
-            "custom_rule_count": len(processing["custom_rules"]),
-            "custom_rules": [
-                {
-                    "index": index,
-                    **rule,
-                    "value": collector.safe_metadata(rule["value"])
-                    if isinstance(rule["value"], str)
-                    else rule["value"],
-                }
-                for index, rule in enumerate(processing["custom_rules"])
-            ]
-            if collector.detailed
-            else [],
-        }
+        collector.processing_settings(processing)
     if processing["preset"] == "unfiltered":
         if collector is None:
             return query(*query_args, limit, offset)
@@ -902,6 +885,8 @@ def execute_search(
     offset=0,
     collector=None,
 ):
+    if collector is not None and not isinstance(collector, ObservationFacade):
+        collector = ObservationFacade(collector)
     token = ACTIVE_COLLECTOR.set(collector) if collector is not None else None
     try:
         imdb_id = normalize_imdb(imdbid)
@@ -923,9 +908,7 @@ def execute_search(
             "subtitle_language_correction"
         ]
         if collector is not None:
-            collector.report["serialization_settings"] = {
-                "subtitle_language_correction": subtitle_language_correction
-            }
+            collector.serialization_settings(subtitle_language_correction)
             collector.complete()
         if t == "search":
             query, args = query_generic, (q,)
@@ -940,20 +923,20 @@ def execute_search(
             collector.begin("serialization")
         xml = make_rss(rows, subtitle_language_correction=subtitle_language_correction)
         if collector is not None:
-            if collector.detailed:
-                collector.serialized(fromstring(xml))
-            else:
-                collector.serialized()
-            collector.complete()
+            if collector.serialized(xml):
+                collector.complete()
         return xml
     except Exception:
         if collector is not None:
             collector.fail()
         raise
     finally:
-        if collector is not None:
-            collector.finish()
-            ACTIVE_COLLECTOR.reset(token)
+        try:
+            if collector is not None:
+                collector.finish()
+        finally:
+            if token is not None:
+                ACTIVE_COLLECTOR.reset(token)
 
 
 @app.get("/api")
@@ -1005,20 +988,18 @@ def torznab(
 
 def diagnostic_search(parameters):
     collector = SearchCollector()
-    collector.report["application_version"] = APP_VERSION
-    collector.report["snapshot_version"] = None
+    snapshot = None
     try:
-        collector.report["snapshot_version"] = safe_text(
-            app.state.snapshot_updater.status().get("installed_version")
-        )
+        snapshot = app.state.snapshot_updater.status().get("installed_version")
     except Exception:
         pass
+    collector.versions(APP_VERSION, snapshot)
     try:
         execute_search(**parameters, collector=collector)
     except Exception:
         # The report already records a safe partial-stage error; never expose exc.
         pass
-    return collector.report
+    return collector.snapshot()
 
 
 app.state.diagnostic_search = diagnostic_search

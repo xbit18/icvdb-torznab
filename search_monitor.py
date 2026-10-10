@@ -8,7 +8,13 @@ from time import perf_counter
 from starlette.datastructures import QueryParams
 
 from diagnostic_models import MonitoredRequest, SearchInput
-from search_diagnostics import PARAMETERS, SearchCollector, safe_parameters, safe_text
+from search_diagnostics import (
+    PARAMETERS,
+    ObservationFacade,
+    SearchCollector,
+    safe_parameters,
+    safe_text,
+)
 
 
 class SearchMonitor:
@@ -58,6 +64,7 @@ class SearchMonitor:
             "original": original,
             "normalized": normalized,
             "strategy": safe_text(report["strategy"], 64),
+            "strategies": deepcopy(report["strategies"][:32]),
             "stages": deepcopy(report["stages"]),
             "counts": dict(report["counts"]),
             "duration_ms": duration_ms,
@@ -86,59 +93,15 @@ class SearchMonitor:
             self._entries.extend(entries)
 
 
-class MonitoringCollector(SearchCollector):
-    """Instrumentation faults are isolated from the client execution."""
+class MonitoringCollector(ObservationFacade):
+    """Metadata-only facade; response transparency is shared with diagnostics."""
 
     def __init__(self):
-        super().__init__(detailed=False)
+        super().__init__(SearchCollector(detailed=False))
 
-    def __getattribute__(self, name):
-        value = super().__getattribute__(name)
-        if name not in {
-            "begin",
-            "complete",
-            "fail",
-            "finish",
-            "inputs",
-            "window",
-            "page",
-            "observer",
-            "serialized",
-        }:
-            return value
-
-        def safely(*args, **kwargs):
-            try:
-                return value(*args, **kwargs)
-            except Exception:
-                self.report["truncated"] = True
-                self.report["replayable"] = False
-                if name == "observer":
-                    return NullObserver()
-                return None
-
-        return safely
-
-    def observer(self, *args):
-        actual = super().observer(*args)
-
-        class SafeObserver:
-            order = []
-
-            def __call__(self, *args):
-                try:
-                    actual(*args)
-                except Exception:
-                    pass
-
-        return SafeObserver()
-
-
-class NullObserver:
-    order = []
-
-    def __call__(self, *args):
-        pass
+    @property
+    def report(self):
+        return self.collector.report
 
 
 class SearchMonitoringMiddleware:
@@ -160,9 +123,12 @@ class SearchMonitoringMiddleware:
                     if request_id is not None:
                         collector = MonitoringCollector()
                         collector.inputs(
-                            {key: params[key] for key in PARAMETERS if key in params}, {}
+                            {
+                                "t": "search",
+                                **{key: params[key] for key in PARAMETERS if key in params},
+                            },
+                            {},
                         )
-                        collector.report["original"].setdefault("t", "search")
                         scope.setdefault("state", {})["search_collector"] = collector
         except Exception:
             collector = None

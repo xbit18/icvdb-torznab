@@ -13,7 +13,8 @@ export interface SearchInput {
   offset?: number
 }
 export type Parameters = Record<string, string | number | null>
-export type StageName = 'input' | 'database' | 'processing' | 'serialization'
+export type LegacyStageName = 'input' | 'database' | 'processing' | 'serialization'
+export type StageName = LegacyStageName | 'search' | 'merge'
 export interface Stage {
   status: 'not_run' | 'running' | 'success' | 'failed'
   duration_ms: number
@@ -46,6 +47,23 @@ export interface Release {
   score: number
   score_rules: number[]
 }
+export interface StrategyExecution {
+  identifier: string
+  status: 'running' | 'success' | 'partial' | 'failed'
+  duration_ms: number
+  candidates: number | null
+  unique_contribution: number | null
+  metadata: { field?: string | null; match_type?: string | null }
+}
+export interface Provenance {
+  identity: string
+  occurrences: string[]
+  strategies: string[]
+  match_evidence: { strategy: string; field?: string | null; match_type?: string | null }[]
+  deduplicated: boolean | null
+  relevance: number | null
+  included: boolean | null
+}
 export interface Processing {
   preset: 'unfiltered' | 'italian_only' | 'italian_preferred' | 'custom'
   subtitle_language_correction: boolean
@@ -64,15 +82,14 @@ export interface Observation {
   original: Parameters
   normalized: Parameters
   strategy: string | null
-  stages: Record<StageName, Stage>
+  stages: Record<LegacyStageName, Stage> & Partial<Record<'search' | 'merge', Stage>>
   counts: Counts
   errors: SafeError[]
   duration_ms: number
   truncated: boolean
   replayable: boolean
 }
-export interface SearchReport extends Observation {
-  report_version: 1
+interface ReportDetails extends Observation {
   application_version: string
   snapshot_version: string | null
   generated_at: string
@@ -82,10 +99,21 @@ export interface SearchReport extends Observation {
   releases: Release[]
   limitations: string[]
 }
+export interface SearchReportV1 extends ReportDetails {
+  report_version: 1
+}
+export interface SearchReportV2 extends ReportDetails {
+  report_version: 2
+  strategies: StrategyExecution[]
+  provenance: Provenance[]
+  releases: (Release & { identity: string })[]
+}
+export type SearchReport = SearchReportV1 | SearchReportV2
 export interface MonitoredRequest extends Observation {
   id: number
   timestamp: string
   status_code: number
+  strategies?: StrategyExecution[]
 }
 export interface MonitoringStatus {
   enabled: boolean
@@ -117,7 +145,36 @@ export const diagnosticsApi = {
 // Project every level of the versioned contract. Never serialize arbitrary response fields.
 function pick(value: unknown, keys: readonly string[]): Record<string, unknown> {
   const object = value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
-  return Object.fromEntries(keys.filter((key) => key in object).map((key) => [key, object[key]]))
+  return Object.fromEntries(
+    keys
+      .filter(
+        (key) =>
+          key in object &&
+          (object[key] === null || ['string', 'number', 'boolean'].includes(typeof object[key])),
+      )
+      .map((key) => [key, object[key]]),
+  )
+}
+export function observedStages(observation: Observation): StageName[] {
+  return (['input', 'search', 'database', 'merge', 'processing', 'serialization'] as const).filter(
+    (name) => observation.stages[name],
+  )
+}
+function projectStrategies(strategies: StrategyExecution[]) {
+  return strategies.slice(0, 32).map((strategy) => ({
+    ...pick(strategy, ['identifier', 'status', 'duration_ms', 'candidates', 'unique_contribution']),
+    metadata: projectMetadata(strategy.metadata),
+  }))
+}
+function projectMetadata(value: unknown) {
+  const metadata = pick(value, ['field', 'match_type'])
+  const allowed: Record<string, readonly unknown[]> = {
+    field: [null, 'title', 'imdb', 'tmdb', 'season', 'episode'],
+    match_type: [null, 'exact', 'contains', 'token', 'browse'],
+  }
+  return Object.fromEntries(
+    Object.entries(metadata).filter(([key, item]) => allowed[key]!.includes(item)),
+  )
 }
 function safe(value: unknown): unknown {
   if (typeof value === 'string')
@@ -125,6 +182,7 @@ function safe(value: unknown): unknown {
       .replace(/(?:magnet:\?|[a-z][a-z0-9+.-]*:\/\/)\S*/gi, '[redacted]')
       .replace(/(?:\/|[A-Z]:\\)[^\s]+/g, '[redacted]')
       .replace(/(?:password|apikey|api_key|token)\s*[:=]\s*\S+/gi, '[redacted]')
+      .replace(/\b(?:[a-f0-9]{40}|[a-z2-7]{32})\b/gi, '[redacted]')
       .split('')
       .filter((character) => character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127)
       .join('')
@@ -135,7 +193,8 @@ function safe(value: unknown): unknown {
   return typeof value === 'number' && !Number.isFinite(value) ? null : value
 }
 export function exportReport(report: SearchReport): string {
-  if (report.report_version !== 1) throw new Error('Unsupported report version')
+  if (report.report_version !== 1 && report.report_version !== 2)
+    throw new Error('Unsupported report version')
   const parameters = ['t', 'q', 'imdbid', 'tmdbid', 'season', 'ep', 'cat', 'limit', 'offset']
   const projected = {
     ...pick(report, [
@@ -151,7 +210,7 @@ export function exportReport(report: SearchReport): string {
     original: pick(report.original, parameters),
     normalized: pick(report.normalized, parameters),
     stages: Object.fromEntries(
-      (['input', 'database', 'processing', 'serialization'] as const).map((name) => [
+      observedStages(report).map((name) => [
         name,
         pick(report.stages[name], ['status', 'duration_ms']),
       ]),
@@ -185,6 +244,7 @@ export function exportReport(report: SearchReport): string {
       ? pick(report.serialization_settings, ['subtitle_language_correction'])
       : null,
     releases: report.releases.slice(0, 2000).map((release) => ({
+      ...(report.report_version === 2 ? pick(release, ['identity']) : {}),
       ...pick(release, [
         'id',
         'title',
@@ -203,6 +263,22 @@ export function exportReport(report: SearchReport): string {
     })),
     errors: report.errors.slice(0, 4).map((error) => pick(error, ['stage', 'code', 'message'])),
     limitations: report.limitations.slice(0, 8),
+    ...(report.report_version === 2
+      ? {
+          strategies: projectStrategies(report.strategies),
+          provenance: report.provenance.slice(0, 2000).map((item) => ({
+            ...pick(item, ['identity', 'deduplicated', 'relevance', 'included']),
+            occurrences: item.occurrences
+              .slice(0, 2000)
+              .filter((value) => typeof value === 'string'),
+            strategies: item.strategies.slice(0, 32).filter((value) => typeof value === 'string'),
+            match_evidence: item.match_evidence.slice(0, 32).map((evidence) => ({
+              ...pick(evidence, ['strategy']),
+              ...projectMetadata(evidence),
+            })),
+          })),
+        }
+      : {}),
   }
   const serialized = JSON.stringify(safe(projected), null, 2)
   if (new Blob([serialized]).size > 4_000_000) throw new Error('Report exceeds export limit')
@@ -236,7 +312,7 @@ export function exportHistory(requests: MonitoredRequest[]): string {
       original: scalars(entry.original, parameters),
       normalized: scalars(entry.normalized, parameters),
       stages: Object.fromEntries(
-        (['input', 'database', 'processing', 'serialization'] as const).map((name) => [
+        observedStages(entry).map((name) => [
           name,
           scalars(entry.stages[name], ['status', 'duration_ms']),
         ]),
@@ -250,6 +326,7 @@ export function exportHistory(requests: MonitoredRequest[]): string {
         'returned',
       ]),
       errors: entry.errors.map((error) => scalars(error, ['stage', 'code', 'message'])),
+      ...(entry.strategies ? { strategies: projectStrategies(entry.strategies) } : {}),
     })),
   }
   const serialized = JSON.stringify(safe(projected), null, 2)

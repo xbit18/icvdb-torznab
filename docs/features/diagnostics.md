@@ -14,7 +14,9 @@ accetta le release.
    categorie sono accettate ma non filtrano le query attuali. La diagnostica
    conserva questo comportamento, senza ampliare le ricerche o disattivare i
    filtri.
-4. Premi **Esegui diagnostica** e controlla gli stati delle quattro fasi.
+4. Premi **Esegui diagnostica** e controlla gli stati delle fasi. Le fasi
+   opzionali di ricerca/fusione compaiono solo se osservate; restano le quattro
+   fasi esistenti.
 5. Esamina candidati, motivo di esclusione, punteggio/indici delle regole e
    correzione dei sottotitoli. In **Parametri, impostazioni e finestre** puoi
    confrontare input originale e normalizzato, preset/regole effettive e
@@ -45,6 +47,28 @@ Stremio.
 Se il database non è disponibile o è in sostituzione, attendi e riprova. Un
 errore di fase mantiene solo i dati osservati; un errore HTTP può non produrre
 alcun report.
+
+### Esecuzioni delle strategie e provenienza
+
+Il report v2 elenca ogni esecuzione osservata con stato, durata e numero di
+candidati. Un'esecuzione parziale o non riuscita non dimostra l'assenza di
+release corrispondenti. Il motore attuale usa ancora un solo ramo di query
+esistente per finestra esaminata: il formato del report non aggiunge strategie e
+non amplia i risultati.
+
+**Provenienza dei risultati** raggruppa le osservazioni tramite un'identità
+opaca SHA256 derivata dall'info-hash memorizzato. L'identità resta stabile tra
+ordinamenti e finestre, mentre gli ID delle singole occorrenze mantengono
+distinte le decisioni di filtro e paginazione delle righe duplicate. I conteggi
+includono le occorrenze ripetute, non solo le identità uniche. Gli
+identificatori delle strategie e le evidenze categoriali descrivono le fonti
+osservate, non l'accettazione a valle.
+
+Contributo univoco, deduplicazione, rilevanza e inclusione a livello di identità
+mostrano **Non disponibile** (`null`) se non osservati esplicitamente. Il motore
+attuale non deduplica, non fonde risultati e non calcola la rilevanza di
+ricerca; il punteggio di elaborazione resta quello separato di preset/regole.
+Un'identità ripetuta non dimostra che sia avvenuta una deduplicazione.
 
 ## Osservare le richieste dei client
 
@@ -82,9 +106,10 @@ sensibili.
 
 1. Dopo una ricerca, premi **Esporta report**.
 2. Leggi **Anteprima report**: è il JSON che verrà scaricato, con versione
-   report `1`, versioni applicazione/snapshot, parametri sanificati,
-   impostazioni, fasi, finestre, conteggi, dettagli dei candidati ed errori
-   sicuri.
+   report `2`, versioni applicazione/snapshot, parametri sanificati,
+   impostazioni, fasi, finestre, conteggi, esecuzioni delle strategie,
+   provenienza, dettagli dei candidati ed errori sicuri. Il browser permette
+   anche di esportare report precedenti v1.
 3. Premi **Scarica JSON**, poi rimuovi eventuali dati privati prima di allegarlo
    a una segnalazione. Il download è locale e non invia dati a servizi esterni.
 

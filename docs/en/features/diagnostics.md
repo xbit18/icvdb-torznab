@@ -12,7 +12,9 @@ does not change the search or check whether downstream clients accept releases.
    (TV only), categories, limit and offset. Limit: 1–200; offset: 0–1000000.
    Categories are accepted but do not filter current queries. Diagnostics
    preserves that behavior without widening searches or disabling filters.
-4. Select **Run diagnostics** and check the four stage statuses.
+4. Select **Run diagnostics** and check the stage statuses. Optional
+   search/merge phases appear only when observed; the existing four phases
+   remain available.
 5. Inspect candidates, exclusion reasons, scores/rule indices and subtitle
    correction. **Parameters, settings and windows** lets you compare original
    and normalized input, effective preset/rules and database windows.
@@ -40,6 +42,27 @@ Stremio addon. It does not scrape or compare live Stremio results.
 
 If the database is unavailable or being switched, wait and retry. Stage errors
 retain only observed information; an HTTP error may produce no report at all.
+
+### Strategy executions and provenance
+
+Report v2 lists each observed strategy execution with status, duration and
+candidate count. A partial or failed execution does not prove that no matching
+release exists. The current engine still uses one existing query branch per
+inspected window; this report format does not add search strategies or widen
+results.
+
+**Result provenance** groups observations by an opaque SHA256 identity derived
+from the stored info-hash. It is stable across ordering/windows, but distinct
+occurrence IDs preserve duplicate-row filtering and pagination decisions.
+Candidate counts include repeated occurrences, not just unique identities.
+Strategy identifiers and categorical match evidence describe the observed
+sources, not downstream acceptance.
+
+Unique contribution, deduplication, relevance and identity-level inclusion show
+**Not available** (`null`) unless explicitly observed. The current engine does
+not deduplicate, merge or calculate search relevance; the existing processing
+score is a separate preset/rule score. A repeated identity is not evidence of
+deduplication.
 
 ## Observe client requests
 
@@ -74,8 +97,9 @@ described below apply; query terms may still be sensitive.
 
 1. After a search, select **Export report**.
 2. Read **Report preview**: it is the JSON that will be downloaded, with report
-   version `1`, application/snapshot versions, sanitized parameters, settings,
-   stages, windows, counts, candidate details and safe errors.
+   version `2`, application/snapshot versions, sanitized parameters, settings,
+   stages, windows, counts, strategy executions, provenance, candidate details
+   and safe errors. The browser also supports exporting older v1 reports.
 3. Select **Download JSON**, then remove private data before attaching it to an
    issue. Download is local and sends nothing to external services.
 

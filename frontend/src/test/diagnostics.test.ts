@@ -4,7 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { router } from '../router'
 import DiagnosticsView from '../views/DiagnosticsView.vue'
 import { useLocale } from '../i18n'
-import { exportReport, type SearchReport } from '../api/diagnostics'
+import {
+  exportReport,
+  exportHistory,
+  type SearchReport,
+  type MonitoredRequest,
+} from '../api/diagnostics'
 
 function report() {
   return {
@@ -121,6 +126,48 @@ function entry(replayable = true) {
     replayable,
   }
 }
+function reportV2() {
+  return {
+    ...report(),
+    report_version: 2,
+    stages: {
+      ...report().stages,
+      search: { status: 'success', duration_ms: 3 },
+      merge: { status: 'success', duration_ms: 1 },
+    },
+    strategies: [
+      {
+        identifier: 'synthetic_exact',
+        status: 'success',
+        duration_ms: 2,
+        candidates: 2,
+        unique_contribution: null,
+        metadata: { field: 'imdb', sql: 'secret' },
+      },
+      {
+        identifier: 'synthetic_title',
+        status: 'partial',
+        duration_ms: 1,
+        candidates: 1,
+        unique_contribution: null,
+        metadata: { match_type: 'contains' },
+      },
+    ],
+    releases: report().releases.map((item) => ({ ...item, identity: 'c'.repeat(64) })),
+    provenance: [
+      {
+        identity: 'c'.repeat(64),
+        occurrences: ['0:0', '0:1'],
+        strategies: ['synthetic_exact', 'synthetic_title'],
+        match_evidence: [{ strategy: 'synthetic_exact', field: 'imdb', token: 'secret' }],
+        deduplicated: null,
+        relevance: null,
+        included: null,
+        info_hash: 'a'.repeat(40),
+      },
+    ],
+  }
+}
 const fetchMock = vi.fn()
 let enabled = false
 let history = [entry()]
@@ -162,6 +209,78 @@ describe('diagnostics', () => {
     vi.useRealTimers()
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
+  })
+
+  it('renders v2 strategy executions, optional phases and unavailable provenance facts', async () => {
+    fetchMock.mockResolvedValue(json(reportV2()))
+    mount()
+    await run()
+    expect(screen.getByRole('heading', { name: 'Search execution' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Merge observations' })).toBeTruthy()
+    expect(screen.getByText('synthetic_exact')).toBeTruthy()
+    expect(screen.getByText('synthetic_title')).toBeTruthy()
+    expect(screen.getByText('Partial')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Result provenance' })).toBeTruthy()
+    expect(screen.getByText(/synthetic_exact · imdb/)).toBeTruthy()
+    expect(screen.getByText(/Deduplicated: Not available/)).toBeTruthy()
+    expect(screen.queryByText('secret')).toBeNull()
+  })
+
+  it('shows partial strategy execution in request history without changing replay', async () => {
+    const r = reportV2()
+    history = [
+      { ...entry(), strategies: r.strategies, stages: r.stages } as (typeof history)[number],
+    ]
+    mount()
+    await requests()
+    expect(screen.getByText('The diagnostic pipeline did not complete.')).toBeTruthy()
+    await fireEvent.click(screen.getByRole('button', { name: 'Inspect request 1' }))
+    expect(screen.getByText(/synthetic_title · Partial/)).toBeTruthy()
+    expect(
+      (screen.getByRole('button', { name: 'Replay request' }) as HTMLButtonElement).disabled,
+    ).toBe(false)
+  })
+
+  it('exports v2 provenance and strategies with scalar allowlists, retains v1 export and independent history version', () => {
+    const r = reportV2()
+    r.original.q = `hash ${'a'.repeat(40)} /Users/private token=secret`
+    const exported = exportReport(r as unknown as SearchReport)
+    const parsed = JSON.parse(exported)
+    expect(parsed.report_version).toBe(2)
+    expect(parsed.strategies).toHaveLength(2)
+    expect(parsed.strategies[1].status).toBe('partial')
+    expect(parsed.provenance[0].identity).toBe('c'.repeat(64))
+    expect(parsed.provenance[0].relevance).toBeNull()
+    expect(parsed.stages.merge.status).toBe('success')
+    expect(parsed.releases[0].identity).toBe('c'.repeat(64))
+    expect(exported).not.toContain('secret')
+    expect(exported).not.toContain('a'.repeat(40))
+    expect(exported).not.toContain('info_hash')
+    const unsafeMetadata = {
+      ...r,
+      strategies: [
+        {
+          ...r.strategies[0],
+          metadata: { field: 'SELECT private', match_type: 'password=private' },
+        },
+      ],
+    }
+    expect(exportReport(unsafeMetadata as unknown as SearchReport)).not.toContain('SELECT private')
+    const malicious = {
+      ...r,
+      strategies: [{ ...r.strategies[0], metadata: { field: { password: 'nested-secret' } } }],
+    }
+    expect(exportReport(malicious as unknown as SearchReport)).not.toContain('nested-secret')
+    expect(JSON.parse(exportReport(report() as unknown as SearchReport)).report_version).toBe(1)
+    const historyText = exportHistory([
+      { ...entry(), strategies: r.strategies, stages: r.stages } as unknown as MonitoredRequest,
+    ])
+    const history = JSON.parse(historyText)
+    expect(history.export_version).toBe(1)
+    expect(history.requests[0].strategies).toHaveLength(2)
+    expect(history.requests[0].stages.search.status).toBe('success')
+    expect(historyText).not.toContain('secret')
+    expect(history.requests[0].provenance).toBeUndefined()
   })
 
   it('registers a native route with Search as default and explicit no-report state', () => {

@@ -44,7 +44,7 @@ def test_monitor_defaults_off_and_diagnostic_report_is_safe(client):
     response = client.post("/webapi/diagnostics/search", json={"q": "Movie"})
     assert response.status_code == 200
     report = response.json()
-    assert report["report_version"] == 1
+    assert report["report_version"] == 2
     assert report["application_version"] == backend.APP_VERSION
     assert "snapshot_version" in report
     assert report["stages"]["serialization"]["status"] == "success"
@@ -167,14 +167,31 @@ def test_monitor_bounded_integer_fields_and_nonreplayable_validation(client):
     assert entry["replayable"] is False
 
 
-def test_monitor_collector_fault_does_not_change_response(client, monkeypatch):
+@pytest.mark.parametrize(
+    "event",
+    [
+        "begin",
+        "complete",
+        "finish",
+        "inputs",
+        "processing_settings",
+        "serialization_settings",
+        "strategy_begin",
+        "strategy_complete",
+        "window",
+        "observer",
+        "page",
+        "serialized",
+    ],
+)
+def test_monitor_collector_fault_does_not_change_response(client, monkeypatch, event):
     enable(client)
     expected = client.get("/api", params={"q": "same"})
 
     def fail(*args, **kwargs):
         raise RuntimeError("collector broken")
 
-    monkeypatch.setattr(backend.SearchCollector, "observer", fail)
+    monkeypatch.setattr(backend.SearchCollector, event, fail)
     actual = client.get("/api", params={"q": "same"})
     assert (actual.status_code, actual.content) == (expected.status_code, expected.content)
 
