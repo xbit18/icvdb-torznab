@@ -29,16 +29,19 @@ runtime container.
 
 ## Modules
 
-| Module | Responsibility |
-| --- | --- |
-| `app.py` | FastAPI lifecycle, Torznab queries/XML, result-processing integration, static WebUI serving |
-| `settings.py` | Schema-v1 validation, atomic persistence, environment precedence, public secret masking |
-| `result_processor.py` | Italian presets and bounded custom score/exclusion rules |
-| `webapi.py` | Same-origin JSON status, settings, processing, and Prowlarr endpoints |
-| `prowlarr.py` | `X-Api-Key` client, Generic Torznab schema derivation, test/create/idempotency |
-| `snapshot_updater.py` | Snapshot discovery, validation, candidate restore, switch, rollback, updater state |
-| `frontend/` | Vue 3 WebUI source and shared product design tokens |
-| `entrypoint.sh` | PostgreSQL bootstrap, first snapshot restore, Uvicorn lifecycle, clean shutdown |
+| Module                  | Responsibility                                                                              |
+| ----------------------- | ------------------------------------------------------------------------------------------- |
+| `app.py`                | FastAPI lifecycle, Torznab queries/XML, result-processing integration, static WebUI serving |
+| `settings.py`           | Schema-v1 validation, atomic persistence, environment precedence, public secret masking     |
+| `result_processor.py`   | Italian presets and bounded custom score/exclusion rules                                    |
+| `webapi.py`             | Same-origin JSON status, settings, processing, Prowlarr, and diagnostics endpoints          |
+| `diagnostic_models.py`  | Strict bounded diagnostic inputs and report-v1 response contracts                           |
+| `search_diagnostics.py` | Optional request-scoped stage/window/candidate collection and structural redaction          |
+| `search_monitor.py`     | Failure-isolated Torznab observation and bounded thread-safe in-memory history              |
+| `prowlarr.py`           | `X-Api-Key` client, Generic Torznab schema derivation, test/create/idempotency              |
+| `snapshot_updater.py`   | Snapshot discovery, validation, candidate restore, switch, rollback, updater state          |
+| `frontend/`             | Vue 3 WebUI source and shared product design tokens                                         |
+| `entrypoint.sh`         | PostgreSQL bootstrap, first snapshot restore, Uvicorn lifecycle, clean shutdown             |
 
 ## Image build and startup
 
@@ -162,6 +165,56 @@ and filtered pages are not backfilled from later windows.
 
 This pipeline affects only ICVDB's XML response. It cannot guarantee downstream
 Radarr/Sonarr selection. Hard filters hide results from Prowlarr entirely.
+
+## Search diagnostics and request monitoring
+
+`/diagnostics` in the Vue WebUI defaults to Search. Its simple/advanced form sends
+`POST /webapi/diagnostics/search` to the same `execute_search()` path as `/api`:
+normalization → database window lookup → existing result processing/pagination →
+ElementTree serialization and validation of the actual RSS root and item count.
+There is no second SQL or filtering implementation. The collector is scoped through
+a `ContextVar` and does not change normal ordering, ignored parameters, subtitle
+correction, settings precedence, or snapshot-switch behavior. `cat` remains accepted
+but unused by queries; TV searches still ignore `tmdbid`.
+
+Report v1 carries original/normalized allowlisted parameters, selected strategy,
+four stage statuses/timings, inspected windows, processing settings/indexed rules,
+separate serialization settings, app/snapshot versions, bounded candidate metadata,
+safe errors, truncation/replayability flags and limitations. Counts are window-local,
+not database totals. Candidates may be excluded, retained outside the page, selected
+for serialization, or returned; selected rows become returned only after actual XML
+validation succeeds. Returned language is read from XML, separately from the
+subtitle-correction flag used during processing. Stage failures produce partial
+reports with HTTP `200`: consumers must inspect statuses/errors, not HTTP success.
+Invalid diagnostic JSON produces a safe `422`; maintenance middleware can return
+`503` before diagnostic handlers run.
+
+Requests uses `GET/PUT /webapi/diagnostics/monitoring` and
+`GET/DELETE /webapi/diagnostics/requests`. Monitoring defaults off and is runtime-only.
+A lock-protected buffer stores at most 100 arrival-newest-first metadata entries;
+slow older completions cannot evict newer arrivals. No release sets, headers, client
+addresses, keys, magnets, SQL, raw exceptions or database configuration are retained.
+Observation faults do not replace the original Torznab response. Disabling capture
+preserves existing history; clearing removes it; restart clears history and state.
+The browser polls sequentially every five seconds only in Requests and aborts/guards
+pending refreshes when leaving, clearing or toggling. It cancels outstanding work on
+unmount so stale refreshes cannot restore cleared data.
+
+Replay is a fresh diagnostic POST using a replayable entry's **original** parameters,
+including intentionally ignored fields. Current settings and the current local
+snapshot apply; historical conditions are not reconstructed. Diagnostic executions
+and replays are not added to incoming-request history.
+
+Export is browser-local JSON, not a new server endpoint or external service. The UI
+projects the versioned allowlist at every level, applies structural redaction, bounds
+arrays/text and rejects downloads over 4 MB. It presents the exact export preview
+and a sharing warning before download. Titles, terms and rule values can still be
+sensitive: structural sanitization does not make a report anonymous. Existing
+trusted-network/authenticated-proxy deployment requirements apply to execution,
+monitoring controls/history and reports, since these endpoints have no authentication.
+No settings migration, persistent logs, new containers or privileged remote execution
+are introduced. Diagnostics cannot compare live Stremio content or identify downstream
+Sonarr/Radarr/Prowlarr rejection reasons.
 
 ## Snapshot invariants
 
