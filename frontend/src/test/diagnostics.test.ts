@@ -431,6 +431,161 @@ describe('diagnostics', () => {
     expect(revoke).toHaveBeenCalledWith('blob:report')
   })
 
+  it('exports fresh full history metadata, not just the inspected entry, after privacy confirmation', async () => {
+    const create = vi.fn().mockReturnValue('blob:history')
+    const revoke = vi.fn()
+    vi.stubGlobal('URL', { createObjectURL: create, revokeObjectURL: revoke })
+    let filename = ''
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      filename = this.download
+    })
+    mount()
+    await requests()
+    await fireEvent.click(screen.getByRole('button', { name: 'Inspect request 1' }))
+    const button = screen.getByRole('button', { name: 'Export history' })
+    expect(screen.getByRole('button', { name: 'Clear history' }).nextElementSibling).toBe(button)
+    const second = { ...entry(false), id: 2, status_code: 503, duration_ms: 19 }
+    history = [entry(), second]
+    await fireEvent.click(button)
+    await flushPromises()
+    const preview = screen.getByRole('region', { name: 'History preview' })
+    expect(
+      within(preview).getByText(/Search terms and release titles may be sensitive/),
+    ).toBeTruthy()
+    const exported = JSON.parse(preview.querySelector('pre')!.textContent!)
+    expect(exported.export_version).toBe(1)
+    expect(exported.kind).toBe('monitored_requests')
+    expect(Number.isNaN(Date.parse(exported.generated_at))).toBe(false)
+    expect(exported.requests).toEqual(history)
+    expect(click).not.toHaveBeenCalled()
+    await fireEvent.click(within(preview).getByRole('button', { name: 'Download JSON' }))
+    expect(filename).toBe('violarr-request-history-v1.json')
+    expect(create.mock.calls[0]![0].type).toBe('application/json')
+    const downloaded = await new Promise<string>((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result))
+      reader.readAsText(create.mock.calls[0]![0])
+    })
+    expect(JSON.parse(downloaded)).toEqual(exported)
+    expect(click).toHaveBeenCalledOnce()
+    expect(revoke).toHaveBeenCalledWith('blob:history')
+  })
+
+  it('disables empty and pending history exports, reports fetch errors without stale downloads', async () => {
+    history = []
+    mount()
+    await requests()
+    const button = screen.getByRole('button', { name: 'Export history' }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    history = [entry()]
+    await fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    await flushPromises()
+    let reject!: (cause: unknown) => void
+    fetchMock.mockImplementation(
+      () =>
+        new Promise<Response>((_, r) => {
+          reject = r
+        }),
+    )
+    await fireEvent.click(button)
+    expect(button.disabled).toBe(true)
+    expect(
+      (screen.getByRole('button', { name: 'Clear history' }) as HTMLButtonElement).disabled,
+    ).toBe(true)
+    reject(new TypeError('offline'))
+    await flushPromises()
+    expect(screen.getByRole('alert')).toBeTruthy()
+    expect(screen.queryByRole('region', { name: 'History preview' })).toBeNull()
+    expect(button.disabled).toBe(false)
+  })
+
+  it('projects and sanitizes every history entry and revokes URLs even on download failure', async () => {
+    mount()
+    await requests()
+    const malicious = {
+      ...entry(),
+      original: {
+        ...entry().original,
+        q: 'Sensitive /Users/private magnet:?xt=secret token=secret',
+        apikey: 'secret',
+      },
+      normalized: { q: { password: 'secret' } },
+      stages: {
+        ...entry().stages,
+        input: { status: 'success', duration_ms: 2, sql: 'secret' },
+        secret: 'secret',
+      },
+      counts: { ...entry().counts, password: 'secret' },
+      errors: [
+        { stage: 'database', code: 'failed', message: 'password=secret', traceback: 'secret' },
+      ],
+      credentials: 'secret',
+    }
+    fetchMock.mockResolvedValue(json({ requests: [malicious, { ...malicious, id: 2 }] }))
+    const create = vi.fn().mockReturnValue('blob:history')
+    const revoke = vi.fn()
+    vi.stubGlobal('URL', { createObjectURL: create, revokeObjectURL: revoke })
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {
+      throw new Error('blocked')
+    })
+    await fireEvent.click(screen.getByRole('button', { name: 'Export history' }))
+    await flushPromises()
+    const preview = screen.getByRole('region', { name: 'History preview' })
+    const text = preview.querySelector('pre')!.textContent!
+    expect(JSON.parse(text).requests).toHaveLength(2)
+    expect(text).toContain('Sensitive')
+    expect(text).toContain('[redacted]')
+    for (const forbidden of [
+      'secret',
+      '/Users/private',
+      'magnet:',
+      'apikey',
+      'credentials',
+      'traceback',
+    ])
+      expect(text).not.toContain(forbidden)
+    await fireEvent.click(within(preview).getByRole('button', { name: 'Download JSON' }))
+    expect(screen.getByRole('alert').textContent).toContain('export')
+    expect(revoke).toHaveBeenCalledWith('blob:history')
+  })
+
+  it('exports all 100 buffered entries without changing monitoring or inspection', async () => {
+    mount()
+    await requests()
+    await fireEvent.click(screen.getByRole('button', { name: 'Inspect request 1' }))
+    history = Array.from({ length: 100 }, (_, index) => ({ ...entry(), id: index + 1 }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Export history' }))
+    await flushPromises()
+    const preview = screen.getByRole('region', { name: 'History preview' })
+    expect(JSON.parse(preview.querySelector('pre')!.textContent!).requests).toEqual(history)
+    expect(screen.getByRole('heading', { name: 'Request details' })).toBeTruthy()
+    expect(enabled).toBe(false)
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method)).toHaveLength(0)
+  })
+
+  it('aborts pending export on unmount and ignores its late response without restarting polling', async () => {
+    vi.useFakeTimers()
+    const view = mount()
+    await requests()
+    let resolve!: (value: Response) => void
+    let signal: AbortSignal | undefined
+    fetchMock.mockImplementation((_: string, init?: RequestInit) => {
+      signal = init?.signal as AbortSignal
+      return new Promise<Response>((r) => {
+        resolve = r
+      })
+    })
+    await fireEvent.click(screen.getByRole('button', { name: 'Export history' }))
+    view.unmount()
+    expect(signal?.aborted).toBe(true)
+    resolve(json({ requests: [entry()] }))
+    await flushPromises()
+    expect(vi.getTimerCount()).toBe(0)
+    expect(screen.queryByRole('region', { name: 'History preview' })).toBeNull()
+  })
+
   it('shows loading, prevents overlapping searches and clears polling on navigation/unmount', async () => {
     vi.useFakeTimers()
     const view = mount()
@@ -488,6 +643,9 @@ describe('diagnostics', () => {
     mount()
     expect(screen.getByRole('heading', { name: 'Diagnostica' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Esegui diagnostica' })).toBeTruthy()
+    await fireEvent.click(screen.getByRole('button', { name: 'Richieste' }))
+    await flushPromises()
+    expect(screen.getByRole('button', { name: 'Esporta cronologia' })).toBeTruthy()
   })
 
   it('does not claim monitoring is disabled when its status cannot be loaded', async () => {

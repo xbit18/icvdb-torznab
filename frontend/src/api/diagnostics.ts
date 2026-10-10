@@ -208,3 +208,51 @@ export function exportReport(report: SearchReport): string {
   if (new Blob([serialized]).size > 4_000_000) throw new Error('Report exceeds export limit')
   return serialized
 }
+
+export function exportHistory(requests: MonitoredRequest[]): string {
+  if (!Array.isArray(requests) || requests.length > 100) throw new Error('Invalid request history')
+  // Every leaf is scalar: unexpected nested objects must not bypass the allowlist.
+  const scalars = (value: unknown, keys: readonly string[]) =>
+    Object.fromEntries(
+      Object.entries(pick(value, keys)).filter(
+        ([, item]) => item === null || ['string', 'number', 'boolean'].includes(typeof item),
+      ),
+    )
+  const parameters = ['t', 'q', 'imdbid', 'tmdbid', 'season', 'ep', 'cat', 'limit', 'offset']
+  const projected = {
+    export_version: 1,
+    kind: 'monitored_requests',
+    generated_at: new Date().toISOString(),
+    requests: requests.map((entry) => ({
+      ...scalars(entry, [
+        'id',
+        'timestamp',
+        'status_code',
+        'strategy',
+        'duration_ms',
+        'truncated',
+        'replayable',
+      ]),
+      original: scalars(entry.original, parameters),
+      normalized: scalars(entry.normalized, parameters),
+      stages: Object.fromEntries(
+        (['input', 'database', 'processing', 'serialization'] as const).map((name) => [
+          name,
+          scalars(entry.stages[name], ['status', 'duration_ms']),
+        ]),
+      ),
+      counts: scalars(entry.counts, [
+        'candidates',
+        'excluded',
+        'retained',
+        'outside_page',
+        'selected',
+        'returned',
+      ]),
+      errors: entry.errors.map((error) => scalars(error, ['stage', 'code', 'message'])),
+    })),
+  }
+  const serialized = JSON.stringify(safe(projected), null, 2)
+  if (new Blob([serialized]).size > 4_000_000) throw new Error('History exceeds export limit')
+  return serialized
+}

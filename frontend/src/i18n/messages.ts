@@ -75,6 +75,8 @@ export const italianMessages = {
   'diagnostics.score': 'Punteggio / indici delle regole applicate',
   'diagnostics.subtitle': 'Correzione sottotitoli applicata durante l’elaborazione',
   'diagnostics.preview': 'Anteprima report',
+  'diagnostics.exportHistory': 'Esporta cronologia',
+  'diagnostics.historyPreview': 'Anteprima cronologia',
   'diagnostics.privacy':
     'Termini di ricerca e titoli delle release possono essere sensibili. Esamina tutto il JSON e rimuovi i dati privati prima di condividerlo. Il download è locale e non invia il report a servizi esterni.',
   'diagnostics.download': 'Scarica JSON',
@@ -398,6 +400,8 @@ export const englishMessages: Messages = {
   'diagnostics.score': 'Score / applied rule indices',
   'diagnostics.subtitle': 'Subtitle correction applied for processing',
   'diagnostics.preview': 'Report preview',
+  'diagnostics.exportHistory': 'Export history',
+  'diagnostics.historyPreview': 'History preview',
   'diagnostics.privacy':
     'Search terms and release titles may be sensitive. Review the entire JSON and remove private data before sharing. The download is local and does not send the report to external services.',
   'diagnostics.download': 'Download JSON',

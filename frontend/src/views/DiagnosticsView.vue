@@ -4,6 +4,7 @@ import { ApiError, apiErrorMessage } from '../api/client'
 import {
   diagnosticsApi,
   exportReport,
+  exportHistory,
   type SearchInput,
   type SearchType,
   type SearchReport,
@@ -33,6 +34,7 @@ const busy = ref(false)
 const error = ref('')
 const replayNotice = ref(false)
 const preview = ref('')
+const historyPreview = ref('')
 const monitoring = ref<MonitoringStatus | null>(null)
 const history = ref<MonitoredRequest[]>([])
 const inspected = ref<MonitoredRequest | null>(null)
@@ -167,6 +169,7 @@ async function refresh() {
 function selectTab(value: 'search' | 'requests') {
   if (tab.value === value) return
   stopPolling()
+  historyPreview.value = ''
   tab.value = value
   if (value === 'requests') void refresh()
 }
@@ -193,6 +196,7 @@ async function changeMonitoring(value: boolean) {
 async function clearHistory() {
   if (actionBusy.value) return
   stopPolling()
+  historyPreview.value = ''
   actionBusy.value = true
   historyError.value = ''
   const controller = new AbortController()
@@ -235,17 +239,43 @@ function prepareExport() {
     error.value = t('diagnostics.exportError')
   }
 }
-function download() {
-  if (!preview.value) return
+async function prepareHistoryExport() {
+  if (disposed || actionBusy.value || historyBusy.value || !history.value.length) return
+  stopPolling()
+  const current = generation
+  actionBusy.value = true
+  historyError.value = ''
+  historyPreview.value = ''
+  const controller = new AbortController()
+  actionController = controller
+  try {
+    const result = await diagnosticsApi.requests(controller.signal)
+    if (!disposed && current === generation && tab.value === 'requests')
+      historyPreview.value = exportHistory(result.requests)
+  } catch (cause) {
+    if (!disposed && current === generation) historyError.value = message(cause)
+  } finally {
+    if (!disposed) {
+      actionBusy.value = false
+      actionController = null
+      schedule()
+    }
+  }
+}
+function download(content = preview.value, historyExport = false) {
+  if (!content) return
   let url: string | null = null
   try {
-    url = URL.createObjectURL(new Blob([preview.value], { type: 'application/json' }))
+    url = URL.createObjectURL(new Blob([content], { type: 'application/json' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = 'violarr-diagnostics-v1.json'
+    anchor.download = historyExport
+      ? 'violarr-request-history-v1.json'
+      : 'violarr-diagnostics-v1.json'
     anchor.click()
   } catch {
-    error.value = t('diagnostics.exportError')
+    if (historyExport) historyError.value = t('diagnostics.exportError')
+    else error.value = t('diagnostics.exportError')
   } finally {
     if (url) URL.revokeObjectURL(url)
   }
@@ -494,7 +524,7 @@ onBeforeUnmount(() => {
         <p class="notice">{{ t('diagnostics.privacy') }}</p>
         <pre class="diagnostics-preview">{{ preview }}</pre>
         <div class="button-row">
-          <button class="button" @click="download">{{ t('diagnostics.download') }}</button
+          <button class="button" @click="download()">{{ t('diagnostics.download') }}</button
           ><button class="button button--secondary" @click="preview = ''">
             {{ t('diagnostics.close') }}
           </button>
@@ -539,12 +569,40 @@ onBeforeUnmount(() => {
             :disabled="actionBusy || !history.length"
             @click="clearHistory"
           >
-            {{ t('diagnostics.clear') }}
+            {{ t('diagnostics.clear') }}</button
+          ><button
+            class="button"
+            :disabled="historyBusy || actionBusy || !history.length"
+            @click="prepareHistoryExport"
+          >
+            {{ t('diagnostics.exportHistory') }}
           </button>
         </div>
         <p v-if="historyBusy" role="status">{{ t('diagnostics.refreshing') }}</p>
         <p v-if="historyError" class="inline-error" role="alert">{{ historyError }}</p>
       </article>
+      <section
+        v-if="historyPreview"
+        class="card"
+        role="region"
+        :aria-label="t('diagnostics.historyPreview')"
+      >
+        <h2>{{ t('diagnostics.historyPreview') }}</h2>
+        <p class="notice">{{ t('diagnostics.privacy') }}</p>
+        <pre class="diagnostics-preview">{{ historyPreview }}</pre>
+        <div class="button-row">
+          <button
+            class="button"
+            :disabled="actionBusy || historyBusy"
+            @click="download(historyPreview, true)"
+          >
+            {{ t('diagnostics.download') }}
+          </button>
+          <button class="button button--secondary" @click="historyPreview = ''">
+            {{ t('diagnostics.close') }}
+          </button>
+        </div>
+      </section>
       <p v-if="!history.length && !historyBusy && !historyError" class="empty-state">
         {{ t('diagnostics.noHistory') }}
       </p>

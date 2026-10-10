@@ -65,6 +65,19 @@ conserva la cronologia; **Svuota cronologia** la elimina. Riavviare Violarr
 azzera stato e cronologia. Richieste oscurate, troncate o non valide non sono
 rieseguibili.
 
+Per salvare l'intero buffer attuale, premi **Esporta cronologia** accanto a
+**Svuota cronologia**. Violarr recupera tutte le richieste registrate in quel
+momento (fino a 100), non solo quella esaminata. Leggi **Anteprima cronologia**
+e l'avviso sulla privacy, poi conferma con **Scarica JSON**. Il file locale
+`violarr-request-history-v1.json` contiene versione di esportazione `1`, data e
+ora di generazione e, per ogni richiesta, parametri originali/normalizzati
+sanificati, strategia, fasi, conteggi, tempi, data e ora, stato HTTP, errori e
+indicatori di troncamento/riesecuzione. Non include set di release o richieste
+già eliminate dalla memoria. L'esportazione è disabilitata con cronologia vuota
+o un'operazione sulla cronologia in corso. Si applicano l'oscuramento e il
+limite di 4 MB descritti sotto; i termini di ricerca possono comunque essere
+sensibili.
+
 ## Condividere un report in sicurezza
 
 1. Dopo una ricerca, premi **Esporta report**.

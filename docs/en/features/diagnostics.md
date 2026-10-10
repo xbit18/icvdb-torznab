@@ -59,6 +59,17 @@ capture stops new entries but preserves history; **Clear history** removes it.
 Restarting Violarr resets both state and history. Redacted, truncated or invalid
 requests cannot be replayed.
 
+To save the entire current buffer, select **Export history** beside **Clear
+history**. Violarr fetches all currently recorded entries (up to 100), not just
+the inspected request. Review **History preview** and its privacy warning, then
+confirm with **Download JSON**. The local file `violarr-request-history-v1.json`
+contains export version `1`, a generation timestamp, and every entry's safe
+original/normalized parameters, strategy, stages, counts, timings, timestamp,
+HTTP status, errors and truncated/replayable flags. It does not include release
+sets or entries already discarded from memory. Export is disabled when history
+is empty or a history operation is pending. The same redaction and 4 MB limit
+described below apply; query terms may still be sensitive.
+
 ## Share a report safely
 
 1. After a search, select **Export report**.
